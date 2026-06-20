@@ -10,6 +10,7 @@ app = FastAPI(title="Project Dashboard API")
 def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
+
 @app.get("/db-health")
 def db_check(db: Session = Depends(get_db)):
     try:
@@ -18,8 +19,5 @@ def db_check(db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
-                "status": "error",
-                "message": str(e)
-            }
+            detail={"status": "error", "message": str(e)},
         )
