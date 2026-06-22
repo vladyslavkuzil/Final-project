@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, status
@@ -12,7 +13,8 @@ from src.modules.documents.router import router as documents_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
+    if os.getenv("APP_ENV", "local") in {"local", "dev"}:
+        Base.metadata.create_all(bind=engine)
     yield
 
 
