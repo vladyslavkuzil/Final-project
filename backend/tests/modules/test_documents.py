@@ -83,6 +83,25 @@ def test_download_document_existing_id_returns_200(
     assert b"MOCK FILE CONTENT" in response.content
 
 
+def test_download_document_content_disposition_exposes_only_basename(
+    client: TestClient, db: Session
+):
+    # Arrange — file_path contains a deep internal path
+    r = client.post(
+        "/project/proj-dl/documents",
+        json={"title": "Path Doc", "file_path": "/internal/secrets/report.pdf"},
+    )
+    doc_id = r.json()["id"]
+
+    # Act
+    response = client.get(f"/document/{doc_id}")
+
+    # Assert — header must contain only the filename, not the full path
+    disposition = response.headers["content-disposition"]
+    assert "report.pdf" in disposition
+    assert "/internal/secrets/" not in disposition
+
+
 def test_download_document_nonexistent_id_returns_404(client: TestClient):
     # Arrange
     doc_id = "does-not-exist-xyz"
