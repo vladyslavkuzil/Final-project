@@ -4,7 +4,6 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: project-dashboard-api
-    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
       - ./backend:/app/backend
     ports:
