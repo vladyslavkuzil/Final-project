@@ -99,9 +99,7 @@ def test_download_document_nonexistent_id_returns_404(client: TestClient):
 # ---------------------------------------------------------------------------
 
 
-def test_update_document_valid_title_returns_200(
-    client: TestClient, created_doc: dict
-):
+def test_update_document_valid_title_returns_200(client: TestClient, created_doc: dict):
     # Arrange
     payload = {"title": "Updated Title"}
 
@@ -142,9 +140,7 @@ def test_update_document_nonexistent_id_returns_404(client: TestClient):
 # ---------------------------------------------------------------------------
 
 
-def test_delete_document_existing_id_returns_204(
-    client: TestClient, created_doc: dict
-):
+def test_delete_document_existing_id_returns_204(client: TestClient, created_doc: dict):
     # Arrange — document seeded via fixture
 
     # Act

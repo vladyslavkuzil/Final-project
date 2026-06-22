@@ -5,7 +5,11 @@ from sqlalchemy.orm import Session
 from src.core.database import get_db
 from src.core.security import get_current_user
 from src.modules.documents import services
-from src.modules.documents.schemas import DocumentCreate, DocumentUpdate, DocumentResponse
+from src.modules.documents.schemas import (
+    DocumentCreate,
+    DocumentUpdate,
+    DocumentResponse,
+)
 
 router = APIRouter()
 
@@ -29,7 +33,9 @@ def upload_document(
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user),
 ):
-    return services.create_document(db, project_id, payload.title, payload.file_path, user_id)
+    return services.create_document(
+        db, project_id, payload.title, payload.file_path, user_id
+    )
 
 
 @router.get("/document/{document_id}")
@@ -39,7 +45,9 @@ def download_document(
 ):
     doc = services.get_document(db, document_id)
     if not doc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
+        )
 
     def _stream():
         yield f"[MOCK FILE CONTENT for: {doc.title}]".encode()
@@ -59,7 +67,9 @@ def update_document(
 ):
     doc = services.update_document(db, document_id, payload.title, payload.file_path)
     if not doc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
+        )
     return doc
 
 
@@ -69,4 +79,6 @@ def delete_document(
     db: Session = Depends(get_db),
 ):
     if not services.delete_document(db, document_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
+        )
