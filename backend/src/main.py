@@ -1,9 +1,25 @@
+import os
+from contextlib import asynccontextmanager
+
+from fastapi import Depends, FastAPI, HTTPException, status
 from sqlalchemy import text
-from fastapi import FastAPI, Depends, HTTPException, status
-from .core.database import get_db
 from sqlalchemy.orm import Session
 
-app = FastAPI(title="Project Dashboard API")
+from src.core.base import Base
+from src.core.database import engine, get_db
+from src.modules.documents.models import Document  # noqa: F401 — registers tables
+from src.modules.documents.router import router as documents_router
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if os.getenv("APP_ENV", "local") in {"local", "dev"}:
+        Base.metadata.create_all(bind=engine)
+    yield
+
+
+app = FastAPI(title="Project Dashboard API", lifespan=lifespan)
+app.include_router(documents_router)
 
 
 @app.get("/health")

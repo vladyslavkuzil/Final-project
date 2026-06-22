@@ -43,6 +43,16 @@ The project expects the following environment variables (see `.env.example`):
 - `SECRET_KEY`, `ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES`
 - `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, `POSTGRES_PORT`, `DATABASE_URL`
 
+Running tests
+-------------
+
+Requires the `db` service to be running. Run the suite inside the `api` container:
+
+```bash
+docker compose -f compose.yml up --build
+docker compose exec api uv run pytest tests/ -v
+```
+
 Notes & next steps
 -------------------
 
