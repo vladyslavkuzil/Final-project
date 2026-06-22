@@ -18,7 +18,7 @@ router = APIRouter()
 
 def _safe_filename(file_path: str) -> str:
     """Return just the basename with header-breaking characters removed."""
-    return Path(file_path).name.replace('"', '').replace('\r', '').replace('\n', '')
+    return Path(file_path).name.replace('"', "").replace("\r", "").replace("\n", "")
 
 
 @router.get("/project/{project_id}/documents", response_model=list[DocumentResponse])
@@ -62,7 +62,9 @@ def download_document(
     return StreamingResponse(
         _stream(),
         media_type="application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{_safe_filename(doc.file_path)}"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{_safe_filename(doc.file_path)}"'
+        },
     )
 
 
