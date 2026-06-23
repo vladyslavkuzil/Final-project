@@ -9,14 +9,6 @@ from src.modules.projects.models import Project
 from .exceptions import ProjectNotFoundError, ProjectAlreadyExistsError
 
 
-# def project_name_exists(db: Session, name: str) -> Project | None:
-#     """
-#     Function allows to show exception class - "name" is set up as unique at model layer. 
-#     """
-#     return db.query(Project).filter(Project.name == name).one_or_none() 
-    #is not None
-
-
 def get_project_by_id(db: Session, project_id: str) -> Project | None:
     """Return a single Project object by its primary key(uuid), None if no project is found.
 
@@ -43,7 +35,7 @@ def get_project_by_name(db: Session, name: str) -> Project | None:
     return db.query(Project).filter(Project.name == name).one_or_none()
 
 
-def create_project(db: Session, name: str, description: str | None) -> Project:
+def create_project(db: Session, name: str, description: str | None = None) -> Project:
     """Create a new project and return it refreshed from the database.
 
     Args:
@@ -52,7 +44,10 @@ def create_project(db: Session, name: str, description: str | None) -> Project:
         description: Project description (null/empty allowed)
     
     Returns:
-        The newly created Project, refreshed from the database. Exception if project name is already in use.
+        The newly created Project object
+    
+    Raises:
+        ProjectAlreadyExistsError - if project name already in use.
     """
     existing_project = get_project_by_name(db, name)
     if existing_project:
@@ -102,7 +97,11 @@ def update_project(
         is_finished: Mark project as done.
     
     Returns:
-        The updated and refreshed Project from the database, or Exception if the document does not exist or if project name is already in use.
+        The updated and refreshed Project from the database,
+    
+    Raises:
+        ProjectNotFoundError - if project is not found.
+        ProjectAlreadyExistsError - if project name already in use.
     """
     project = get_project_by_id(db, project_id)
     if project is None:
@@ -139,6 +138,9 @@ def delete_project(db: Session, project_id: str) -> bool:
     
     Returns:
         True if project is deleted, Exception if project is not found.
+
+    Raises:
+        ProjectNotFoundError - if project is not found.
     """
     project = get_project_by_id(db, project_id)
     if project is None:
