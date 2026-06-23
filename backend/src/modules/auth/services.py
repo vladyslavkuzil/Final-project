@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from .models import User
 from .schemas import UserCreate
-from .security import get_password_hash, verify_password, create_access_token
+from .security import get_password_hash, verify_password
 
 
 def register_user(db: Session, user: UserCreate):
