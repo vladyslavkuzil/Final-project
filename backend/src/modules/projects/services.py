@@ -4,20 +4,46 @@ Projects service layer.
 Handles all CRUD operations for projects.
 """
 
-import uuid
-from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from src.modules.projects.models import Project
+from .exceptions import ProjectNotFoundError, ProjectAlreadyExistsError
 
 
-def project_name_exists(db: Session, name: str) -> bool:
+# def project_name_exists(db: Session, name: str) -> Project | None:
+#     """
+#     Function allows to show exception class - "name" is set up as unique at model layer. 
+#     """
+#     return db.query(Project).filter(Project.name == name).one_or_none() 
+    #is not None
+
+
+def get_project_by_id(db: Session, project_id: str) -> Project | None:
+    """Return a single Project object by its primary key(uuid), None if no project is found.
+
+    Args:
+        db: Active SQLAlchemy session,
+        project_id: Unique project UUID string.
+
+    Returns:
+        The matching Project object, or None if no row is found.
     """
-    Function allows to show HTTP Error code - "name" is set up as unique at model layer. 
+    return db.query(Project).filter(Project.id == project_id).one_or_none()
+
+
+def get_project_by_name(db: Session, name: str) -> Project | None:
+    """Return a single Project object by its name, None if no project is found.
+
+    Args:
+        db: Active SQLAlchemy session,
+        name: Unique project name string.
+
+    Returns:
+        The matching Project object, or None if no row is found.
     """
-    return db.query(Project).filter(Project.name == name).first() is not None
+    return db.query(Project).filter(Project.name == name).one_or_none()
 
 
-def create_project(db: Session, name: str, description: str) -> Project:
+def create_project(db: Session, name: str, description: str | None) -> Project:
     """Create a new project and return it refreshed from the database.
 
     Args:
@@ -26,13 +52,11 @@ def create_project(db: Session, name: str, description: str) -> Project:
         description: Project description (null/empty allowed)
     
     Returns:
-        The newly created Project, refreshed from the database.
+        The newly created Project, refreshed from the database. Exception if project name is already in use.
     """
-    if project_name_exists(db, name):
-        raise HTTPException(
-            status_code=409,
-            detail=f"The name: {name} is already assigned."
-        )
+    existing_project = get_project_by_name(db, name)
+    if existing_project:
+        raise ProjectAlreadyExistsError(existing_project.name)
     
     project = Project(
         name=name,
@@ -50,17 +74,16 @@ def create_project(db: Session, name: str, description: str) -> Project:
     return project
 
 
-def get_project(db: Session, project_id: str) -> Project | None:
-    """Return a single Project object by its primary key(uuid), None if no project is found.
+def get_all_projects(db: Session) -> list[Project]:
+    """Return a list of all Projects.
 
     Args:
         db: Active SQLAlchemy session,
-        project_id: Unique project UUID string.
 
     Returns:
-        The matching Project object, or None if no row is found.
+        Full list of all Projects objects.
     """
-    return db.query(Project).filter(Project.id == project_id).one_or_none()
+    return db.query(Project).all()
 
 
 def update_project(
@@ -79,20 +102,16 @@ def update_project(
         is_finished: Mark project as done.
     
     Returns:
-        The updated and refreshed Project from the database, or None if the document does not exist.
+        The updated and refreshed Project from the database, or Exception if the document does not exist or if project name is already in use.
     """
-    project = get_project(db, project_id)
+    project = get_project_by_id(db, project_id)
     if project is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"The project_id: {project_id} not found."
-        )
+        raise ProjectNotFoundError(project_id)
     
-    if project_name_exists(db, name):
-        raise HTTPException(
-            status_code=409,
-            detail=f"The name: {name} is already assigned."
-        )
+    if name is not None and name != project.name:
+        existing_project = get_project_by_name(db, name)
+        if existing_project:
+            raise ProjectAlreadyExistsError(existing_project.name)
     
     if name is not None:
         project.name = name
@@ -111,3 +130,25 @@ def update_project(
     return project
 
 
+def delete_project(db: Session, project_id: str) -> bool:
+    """Removes project from a database.
+    
+    Args:
+        db: Active SQLAlchemy session,
+        project_id: Unique project UUID string.
+    
+    Returns:
+        True if project is deleted, Exception if project is not found.
+    """
+    project = get_project_by_id(db, project_id)
+    if project is None:
+        raise ProjectNotFoundError(project_id)
+    
+    try:
+        db.delete(project)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    return True
