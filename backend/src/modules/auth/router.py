@@ -24,13 +24,15 @@ def login(
     user = authenticate_user(db, form_data.username, form_data.password)
     access_token = create_access_token(data={"sub": str(user.id)})
     refresh_token = create_refresh_token(data={"sub": str(user.id)})
-    return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+    }
 
 
 @router.post("/refresh", response_model=Token)
-def refresh(
-    body: RefreshRequest, db: Session = Depends(get_db)
-):
+def refresh(body: RefreshRequest, db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid refresh token",
@@ -44,13 +46,13 @@ def refresh(
             raise credentials_exception
     except jwt.PyJWTError:
         raise credentials_exception
-    
+
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise credentials_exception
-    
+
     return {
         "access_token": create_access_token(data={"sub": str(user.id)}),
         "refresh_token": create_refresh_token(data={"sub": str(user.id)}),
-        "token_type": "bearer"
+        "token_type": "bearer",
     }
