@@ -2,7 +2,11 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from src.modules.auth.security import get_password_hash, verify_password, create_access_token
+from src.modules.auth.security import (
+    get_password_hash,
+    verify_password,
+    create_access_token,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -61,9 +65,7 @@ class TestCreateAccessToken:
 
 
 class TestRegister:
-    def test_register_valid_user_returns_200(
-        self, client: TestClient, db: Session
-    ):
+    def test_register_valid_user_returns_200(self, client: TestClient, db: Session):
         # Arrange
         payload = {"email": "newuser@example.com", "password": "securepass"}
 
@@ -95,9 +97,7 @@ class TestRegister:
         assert response.status_code == 400
         assert "already registered" in response.json()["detail"].lower()
 
-    def test_register_invalid_email_returns_422(
-        self, client: TestClient, db: Session
-    ):
+    def test_register_invalid_email_returns_422(self, client: TestClient, db: Session):
         # Arrange
         payload = {"email": "not-an-email", "password": "securepass"}
 
@@ -158,9 +158,7 @@ class TestLogin:
         # Assert
         assert response.status_code == 401
 
-    def test_login_nonexistent_user_returns_401(
-        self, client: TestClient, db: Session
-    ):
+    def test_login_nonexistent_user_returns_401(self, client: TestClient, db: Session):
         # Arrange — no user with this email
 
         # Act
@@ -172,9 +170,7 @@ class TestLogin:
         # Assert
         assert response.status_code == 401
 
-    def test_login_missing_fields_returns_422(
-        self, client: TestClient, db: Session
-    ):
+    def test_login_missing_fields_returns_422(self, client: TestClient, db: Session):
         # Arrange — empty form data
 
         # Act
