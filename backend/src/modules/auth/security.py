@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timedelta, timezone
+import uuid
 import jwt
 import bcrypt
 
@@ -23,7 +24,13 @@ def get_password_hash(password: str) -> str:
 def create_access_token(data: dict) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire, "type": "access"})
+    to_encode.update(
+        {
+            "exp": expire,
+            "type": "access",
+            "jti": str(uuid.uuid4()),
+        }
+    )
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
@@ -32,5 +39,11 @@ def create_refresh_token(data: dict) -> str:
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=int(os.getenv("REFRESH_TOKEN_EXPIRE_MINUTES", "1440"))
     )
-    to_encode.update({"exp": expire, "type": "refresh"})
+    to_encode.update(
+        {
+            "exp": expire,
+            "type": "refresh",
+            "jti": str(uuid.uuid4()),
+        }
+    )
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)

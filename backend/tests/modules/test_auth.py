@@ -6,6 +6,7 @@ from src.modules.auth.security import (
     get_password_hash,
     verify_password,
     create_access_token,
+    create_refresh_token,
 )
 
 
@@ -175,6 +176,121 @@ class TestLogin:
 
         # Act
         response = client.post("/auth/login", data={})
+
+        # Assert
+        assert response.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Unit tests — create_refresh_token
+# ---------------------------------------------------------------------------
+
+
+class TestCreateRefreshToken:
+    def test_returns_non_empty_string(self):
+        token = create_refresh_token(data={"sub": "user-1"})
+        assert isinstance(token, str)
+        assert len(token) > 0
+
+    def test_refresh_token_differs_from_access_token(self):
+        access = create_access_token(data={"sub": "user-1"})
+        refresh = create_refresh_token(data={"sub": "user-1"})
+        assert access != refresh
+
+    def test_different_data_produces_different_tokens(self):
+        t1 = create_refresh_token(data={"sub": "user-1"})
+        t2 = create_refresh_token(data={"sub": "user-2"})
+        assert t1 != t2
+
+
+# ---------------------------------------------------------------------------
+# POST /auth/refresh
+# ---------------------------------------------------------------------------
+
+
+class TestRefresh:
+    def test_refresh_with_valid_token_returns_new_pair(
+        self, client: TestClient, registered_user: dict, db: Session
+    ):
+        # Arrange — login to get a refresh token
+        login_response = client.post(
+            "/auth/login",
+            data={"username": TEST_EMAIL, "password": TEST_PASSWORD},
+        )
+        refresh_token = login_response.json()["refresh_token"]
+
+        # Act
+        response = client.post(
+            "/auth/refresh",
+            json={"refresh_token": refresh_token},
+        )
+
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
+        assert "access_token" in data
+        assert "refresh_token" in data
+        assert data["token_type"] == "bearer"
+        assert len(data["access_token"]) > 0
+        assert len(data["refresh_token"]) > 0
+
+    def test_refresh_returns_different_tokens_than_original(
+        self, client: TestClient, registered_user: dict, db: Session
+    ):
+        # Arrange
+        login_response = client.post(
+            "/auth/login",
+            data={"username": TEST_EMAIL, "password": TEST_PASSWORD},
+        )
+        original = login_response.json()
+
+        # Act
+        response = client.post(
+            "/auth/refresh",
+            json={"refresh_token": original["refresh_token"]},
+        )
+
+        # Assert — new tokens should differ from the originals
+        data = response.json()
+        assert data["access_token"] != original["access_token"]
+
+    def test_refresh_with_access_token_returns_401(
+        self, client: TestClient, registered_user: dict, db: Session
+    ):
+        # Arrange — get an ACCESS token (not refresh)
+        login_response = client.post(
+            "/auth/login",
+            data={"username": TEST_EMAIL, "password": TEST_PASSWORD},
+        )
+        access_token = login_response.json()["access_token"]
+
+        # Act — try to use the access token as a refresh token
+        response = client.post(
+            "/auth/refresh",
+            json={"refresh_token": access_token},
+        )
+
+        # Assert
+        assert response.status_code == 401
+
+    def test_refresh_with_garbage_token_returns_401(
+        self, client: TestClient, db: Session
+    ):
+        # Arrange
+        garbage = "this.is.not.a.valid.jwt"
+
+        # Act
+        response = client.post(
+            "/auth/refresh",
+            json={"refresh_token": garbage},
+        )
+
+        # Assert
+        assert response.status_code == 401
+
+    def test_refresh_with_empty_body_returns_422(self, client: TestClient, db: Session):
+        # Arrange / Act
+        response = client.post("/auth/refresh", json={})
 
         # Assert
         assert response.status_code == 422
