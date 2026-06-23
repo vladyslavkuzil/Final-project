@@ -9,8 +9,9 @@ from src.core.base import Base
 from src.core.database import engine, get_db
 from src.modules.documents.models import Document  # noqa: F401 — registers tables
 from src.modules.documents.router import router as documents_router
+from src.modules.auth.router import router as auth_router
 
-
+    
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if os.getenv("APP_ENV", "local") in {"local", "dev"}:
@@ -20,7 +21,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Project Dashboard API", lifespan=lifespan)
 app.include_router(documents_router)
-
+app.include_router(auth_router)
 
 @app.get("/health")
 def health_check() -> dict[str, str]:
