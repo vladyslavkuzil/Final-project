@@ -8,3 +8,7 @@ class ProjectNotFoundError(Exception):
 
 class ProjectAlreadyExistsError(Exception):
     pass
+
+
+class AccessDeniedError(Exception):
+    pass
