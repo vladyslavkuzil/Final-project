@@ -15,6 +15,16 @@ def created_doc(client: TestClient, db: Session) -> dict:
     return r.json()
 
 
+@pytest.fixture(autouse=True)
+def override_auth():
+    from src.main import app
+    from src.core.security import get_current_user
+
+    app.dependency_overrides[get_current_user] = lambda: "user-999"
+    yield
+    app.dependency_overrides.pop(get_current_user, None)
+
+
 # ---------------------------------------------------------------------------
 # GET /project/{project_id}/documents
 # ---------------------------------------------------------------------------
