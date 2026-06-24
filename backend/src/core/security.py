@@ -1,16 +1,13 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from src.modules.auth.security import SECRET_KEY, ALGORITHM
+from src.core.config import SECRET_KEY, ALGORITHM
 import jwt
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
 def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
-    """Return the authenticated user's ID.
-
-    Placeholder until the auth module implements real JWT verification.
-    """
+    """Return the authenticated user's ID."""
 
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -24,6 +21,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Please use an access token",
+                headers={"WWW-Authenticate": "Bearer"},
             )
         user_id: str = payload.get("sub")
         if user_id is None:

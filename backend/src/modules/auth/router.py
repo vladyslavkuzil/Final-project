@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 from src.core.database import get_db
 from .schemas import UserCreate, UserResponse, Token, RefreshRequest
 from .services import register_user, authenticate_user
-from .security import create_access_token, create_refresh_token, SECRET_KEY, ALGORITHM
+from .security import create_access_token, create_refresh_token
+from src.core.config import SECRET_KEY, ALGORITHM
 from .models import User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -48,7 +49,7 @@ def refresh(body: RefreshRequest, db: Session = Depends(get_db)):
         raise credentials_exception
 
     user = db.query(User).filter(User.id == user_id).first()
-    if user is None:
+    if user is None or not user.is_active:
         raise credentials_exception
 
     return {
