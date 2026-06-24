@@ -5,8 +5,11 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "email-validator>=2.3.0",
     "fastapi[standard]>=0.137.2",
+    "passlib[bcrypt]>=1.7.4",
     "psycopg[binary]>=3.3.4",
+    "pyjwt[crypto]>=2.13.0",
     "pytest>=8.0.0",
     "python-dotenv>=1.2.2",
     "sqlalchemy>=2.0.51",
