@@ -15,9 +15,9 @@ router = APIRouter()
 
 
 @router.post(
-        "/projects",
-        response_model=schemas.ProjectResponse,
-        status_code=status.HTTP_201_CREATED,
+    "/projects",
+    response_model=schemas.ProjectResponse,
+    status_code=status.HTTP_201_CREATED,
 )
 def create_project(
     payload: schemas.ProjectCreate,
@@ -69,7 +69,7 @@ def retrieve_project_id(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Project not found."
         )
-    
+
     return project
 
 
@@ -88,7 +88,7 @@ def retrieve_project_name(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Project not found."
         )
-    
+
     return project
 
 

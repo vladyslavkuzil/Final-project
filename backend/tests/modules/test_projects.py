@@ -10,7 +10,13 @@ from src.modules.projects.exceptions import (
 
 
 class SimpleProject:
-    def __init__(self, project_id="proj-123", name="project-1", admin_id="admin-id", description=None):
+    def __init__(
+        self,
+        project_id="proj-123",
+        name="project-1",
+        admin_id="admin-id",
+        description=None,
+    ):
         self.id = project_id
         self.name = name
         self.description = description
@@ -109,16 +115,22 @@ class ProjectServiceUnitTests(unittest.TestCase):
     def test_update_project_raises_when_duplicate_name(self):
         project = SimpleProject()
         other_project = SimpleProject(project_id="proj-2", name="existing-name")
-        with patch.object(services, "get_project_by_id_admin", return_value=project), patch.object(
-            services, "get_project_by_name_admin", return_value=other_project
+        with (
+            patch.object(services, "get_project_by_id_admin", return_value=project),
+            patch.object(
+                services, "get_project_by_name_admin", return_value=other_project
+            ),
         ):
             with self.assertRaises(ProjectAlreadyExistsError):
-                services.update_project(self.db, project.id, "admin-id", name="existing-name")
+                services.update_project(
+                    self.db, project.id, "admin-id", name="existing-name"
+                )
 
     def test_update_project_changes_fields(self):
         project = SimpleProject()
-        with patch.object(services, "get_project_by_id_admin", return_value=project), patch.object(
-            services, "get_project_by_name_admin", return_value=None
+        with (
+            patch.object(services, "get_project_by_id_admin", return_value=project),
+            patch.object(services, "get_project_by_name_admin", return_value=None),
         ):
             updated = services.update_project(
                 self.db,
@@ -151,21 +163,27 @@ class ProjectServiceUnitTests(unittest.TestCase):
     def test_add_user_to_project_raises_when_project_missing(self):
         with patch.object(services, "get_project_by_id_admin", return_value=None):
             with self.assertRaises(ProjectNotFoundError):
-                services.add_user_to_project(self.db, "user-2", "missing-id", "admin-id")
+                services.add_user_to_project(
+                    self.db, "user-2", "missing-id", "admin-id"
+                )
 
     def test_add_user_to_project_raises_when_user_missing(self):
         project = SimpleProject()
         self.db.query.return_value = make_query(None)
         with patch.object(services, "get_project_by_id_admin", return_value=project):
             with self.assertRaises(UserNotFoundError):
-                services.add_user_to_project(self.db, "missing-user", project.id, "admin-id")
+                services.add_user_to_project(
+                    self.db, "missing-user", project.id, "admin-id"
+                )
 
     def test_add_user_to_project_appends_user(self):
         project = SimpleProject()
         user = make_user(user_id="user-2")
         self.db.query.return_value = make_query(user)
         with patch.object(services, "get_project_by_id_admin", return_value=project):
-            updated = services.add_user_to_project(self.db, "user-2", project.id, "admin-id")
+            updated = services.add_user_to_project(
+                self.db, "user-2", project.id, "admin-id"
+            )
 
         self.db.commit.assert_called_once()
         self.assertIn(user, updated.users)

@@ -2,6 +2,7 @@
 Exception classes for Service layer.
 """
 
+
 class ProjectNotFoundError(Exception):
     pass
 

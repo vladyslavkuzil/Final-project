@@ -33,4 +33,3 @@ class ProjectResponse(BaseModel):
     users: list[UserResponse]
 
     model_config = {"from_attributes": True}
-
