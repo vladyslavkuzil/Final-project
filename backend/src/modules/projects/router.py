@@ -5,6 +5,11 @@ from src.core.database import get_db
 from src.core.security import get_current_user
 
 from src.modules.projects import services, schemas
+from src.modules.projects.exceptions import (
+    ProjectAlreadyExistsError,
+    ProjectNotFoundError,
+    UserNotFoundError,
+)
 
 router = APIRouter()
 
@@ -19,12 +24,23 @@ def create_project(
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
-    return services.create_project(
-        db=db, 
-        name=payload.name, 
-        description=payload.description,
-        admin_id=current_user,
-    )
+    try:
+        return services.create_project(
+            db=db,
+            name=payload.name,
+            description=payload.description,
+            admin_id=current_user,
+        )
+    except ProjectAlreadyExistsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+    except UserNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
 
 
 @router.get(
@@ -42,7 +58,7 @@ def list_projects(
     "/project_id/{project_id}/info",
     response_model=schemas.ProjectResponse,
 )
-def retrieve_project(
+def retrieve_project_id(
     project_id: str,
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user),
@@ -61,7 +77,7 @@ def retrieve_project(
     "/project_name/{project_name}/info",
     response_model=schemas.ProjectResponse,
 )
-def retrieve_project(
+def retrieve_project_name(
     project_name: str,
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user),
@@ -86,14 +102,25 @@ def update_project(
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
-    return services.update_project(
-        db=db,
-        project_id=project_id,
-        user_id=current_user,
-        name=payload.name,
-        description=payload.description,
-        is_finished=payload.is_finished
-    )
+    try:
+        return services.update_project(
+            db=db,
+            project_id=project_id,
+            user_id=current_user,
+            name=payload.name,
+            description=payload.description,
+            is_finished=payload.is_finished,
+        )
+    except ProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
+    except ProjectAlreadyExistsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
 
 
 @router.delete("/project/{project_id}")
@@ -102,11 +129,17 @@ def delete_project(
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
-    return services.delete_project(
-        db=db,
-        project_id=project_id,
-        user_id=current_user,
-    )
+    try:
+        return services.delete_project(
+            db=db,
+            project_id=project_id,
+            user_id=current_user,
+        )
+    except ProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
 
 
 @router.post(
@@ -119,4 +152,15 @@ def invite_user(
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
-    return services.add_user_to_project(db, user_id, project_id,  current_user)
+    try:
+        return services.add_user_to_project(db, user_id, project_id, current_user)
+    except ProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
+    except UserNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )

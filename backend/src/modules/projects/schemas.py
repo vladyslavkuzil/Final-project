@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 
 
 class ProjectCreate(BaseModel):
@@ -15,7 +15,8 @@ class ProjectUpdate(BaseModel):
 
 class UserResponse(BaseModel):
     id: str
-    
+    email: EmailStr
+    is_active: bool
     model_config = {"from_attributes": True}
 
 

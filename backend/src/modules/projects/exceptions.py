@@ -12,3 +12,7 @@ class ProjectAlreadyExistsError(Exception):
 
 class AccessDeniedError(Exception):
     pass
+
+
+class UserNotFoundError(Exception):
+    pass

@@ -5,19 +5,20 @@ Handles all CRUD operations for projects.
 """
 
 from sqlalchemy.orm import Session
-from src.modules.projects.models import Project, User
-from .exceptions import ProjectNotFoundError, ProjectAlreadyExistsError
+from src.modules.projects.models import Project
+from src.modules.auth.models import User
+from .exceptions import ProjectNotFoundError, ProjectAlreadyExistsError, UserNotFoundError
 
 
-def get_or_create_user(db: Session, user_id: str) -> User:
-    user = db.query(User).filter(User.id == user_id).one_or_none()
+# def get_or_create_user(db: Session, user_id: str) -> User:
+#     user = db.query(User).filter(User.id == user_id).one_or_none()
 
-    if user is None:
-        user = User(id=user_id)
-        db.add(user)
-        db.flush()
+#     if user is None:
+#         user = User(id=user_id)
+#         db.add(user)
+#         db.flush()
 
-    return user
+#     return user
 
 
 def get_project_by_id(db: Session, project_id: str, user_id: str) -> Project | None:
@@ -123,7 +124,10 @@ def create_project(
     if existing_project:
         raise ProjectAlreadyExistsError(existing_project.name)
 
-    admin = get_or_create_user(db, admin_id)
+    # admin = get_or_create_user(db, admin_id)
+    admin = db.query(User).filter(User.id == admin_id).one_or_none()
+    if admin is None:
+        raise UserNotFoundError(admin_id)
 
     project = Project(
         name=name,
@@ -251,7 +255,10 @@ def add_user_to_project(db: Session, user_id: str, project_id: str, admin_id: st
     if project is None:
         raise ProjectNotFoundError(project_id)
     
-    user = get_or_create_user(db, user_id)
+    # user = get_or_create_user(db, user_id)
+    user = db.query(User).filter(User.id == user_id).one_or_none()
+    if user is None:
+        raise UserNotFoundError(user_id)
 
     if user not in project.users:
         project.users.append(user)
