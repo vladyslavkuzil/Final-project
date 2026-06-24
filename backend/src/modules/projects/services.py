@@ -119,7 +119,7 @@ def create_project(
     Raises:
         ProjectAlreadyExistsError - if project name already in use.
     """
-    existing_project = get_project_by_name(db, name)
+    existing_project = get_project_by_name(db, name, admin_id)
     if existing_project:
         raise ProjectAlreadyExistsError(existing_project.name)
 
@@ -206,7 +206,7 @@ def update_project(
     return project
 
 
-def delete_project(db: Session, project_id: str, user_id: str) -> bool:
+def delete_project(db: Session, project_id: str, user_id: str) -> dict:
     """Removes project from a database.
     
     Args:

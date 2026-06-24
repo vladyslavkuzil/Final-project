@@ -1,7 +1,4 @@
-from pathlib import Path
-
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from src.core.database import get_db
@@ -42,10 +39,10 @@ def list_projects(
 
 
 @router.get(
-    "/project/{project_id}/info",
+    "/project_id/{project_id}/info",
     response_model=schemas.ProjectResponse,
 )
-def retreive_project(
+def retrieve_project(
     project_id: str,
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user),
@@ -61,10 +58,10 @@ def retreive_project(
 
 
 @router.get(
-    "/project/{project_name}/info",
+    "/project_name/{project_name}/info",
     response_model=schemas.ProjectResponse,
 )
-def retreive_project(
+def retrieve_project(
     project_name: str,
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user),
@@ -81,7 +78,7 @@ def retreive_project(
 
 @router.put(
     "/project/{project_id}/info",
-    response_model=schemas.ProjectUpdate,
+    response_model=schemas.ProjectResponse,
 )
 def update_project(
     project_id: str,

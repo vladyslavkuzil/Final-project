@@ -5,7 +5,6 @@ from pydantic import BaseModel, Field
 class ProjectCreate(BaseModel):
     name: str = Field(max_length=255)
     description: str | None = None
-    admin_id: str = Field(max_length=255)
 
 
 class ProjectUpdate(BaseModel):
@@ -18,7 +17,7 @@ class UserResponse(BaseModel):
     id: str
     
     model_config = {"from_attributes": True}
-    
+
 
 class ProjectResponse(BaseModel):
     id: str
