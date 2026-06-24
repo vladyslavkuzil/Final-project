@@ -4,9 +4,22 @@ Projects service layer.
 Handles all CRUD operations for projects.
 """
 
+from fastapi import Depends
 from sqlalchemy.orm import Session
-from src.modules.projects.models import Project
+from src.modules.projects.models import Project, User
+from src.core.security import get_current_user
 from .exceptions import ProjectNotFoundError, ProjectAlreadyExistsError
+
+
+def get_or_create_user(db: Session, user_id: str) -> User:
+    user = db.query(User).filter(User.id == user_id).one_or_none()
+
+    if user is None:
+        user = User(id=user_id)
+        db.add(user)
+        db.flush()
+
+    return user
 
 
 def get_project_by_id(db: Session, project_id: str) -> Project | None:
@@ -35,7 +48,12 @@ def get_project_by_name(db: Session, name: str) -> Project | None:
     return db.query(Project).filter(Project.name == name).one_or_none()
 
 
-def create_project(db: Session, name: str, description: str | None = None) -> Project:
+def create_project(
+    db: Session, 
+    name: str, 
+    admin_id: str, 
+    description: str | None = None
+) -> Project:
     """Create a new project and return it refreshed from the database.
 
     Args:
@@ -52,11 +70,16 @@ def create_project(db: Session, name: str, description: str | None = None) -> Pr
     existing_project = get_project_by_name(db, name)
     if existing_project:
         raise ProjectAlreadyExistsError(existing_project.name)
-    
+
+    admin = get_or_create_user(db, admin_id)
+
     project = Project(
         name=name,
         description = description,
+        admin_id = admin.id,
     )
+
+    project.users.append(admin)
 
     try:
         db.add(project)

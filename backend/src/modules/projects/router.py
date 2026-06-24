@@ -62,11 +62,13 @@ router = APIRouter()
 def create_project(
     payload: schemas.ProjectCreate,
     db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
 ):
     return services.create_project(
         db=db, 
         name=payload.name, 
-        description=payload.description
+        description=payload.description,
+        admin_id=current_user,
     )
 
 
