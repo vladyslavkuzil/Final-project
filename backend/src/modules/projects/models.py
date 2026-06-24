@@ -18,6 +18,7 @@ class Project(Base):
         String, 
         primary_key=True, 
         default=lambda: str(uuid.uuid4()),
+        unique=True
     )
     name: Mapped[str] = mapped_column(
         String(255), 

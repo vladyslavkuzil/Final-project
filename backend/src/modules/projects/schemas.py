@@ -14,6 +14,12 @@ class ProjectUpdate(BaseModel):
     is_finished: bool | None = None
 
 
+class UserResponse(BaseModel):
+    id: str
+    
+    model_config = {"from_attributes": True}
+    
+
 class ProjectResponse(BaseModel):
     id: str
     name: str
@@ -23,9 +29,8 @@ class ProjectResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     is_finished: bool
+    admin: UserResponse
+    users: list[UserResponse]
 
     model_config = {"from_attributes": True}
 
-class UserResponse(BaseModel):
-    id: str
-    email: str
