@@ -105,11 +105,10 @@ def create_project(
     Raises:
         ProjectAlreadyExistsError - if project name already in use.
     """
-    existing_project = get_project_by_name(db, name, admin_id)
+    existing_project = get_project_by_name(db, name)
     if existing_project:
         raise ProjectAlreadyExistsError(existing_project.name)
 
-    # admin = get_or_create_user(db, admin_id)
     admin = db.query(User).filter(User.id == admin_id).one_or_none()
     if admin is None:
         raise UserNotFoundError(admin_id)
