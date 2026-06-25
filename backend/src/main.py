@@ -1,25 +1,13 @@
-import os
-from contextlib import asynccontextmanager
-
 from fastapi import Depends, FastAPI, HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from src.core.base import Base
-from src.core.database import engine, get_db
+from src.core.database import get_db
 from src.modules.documents.models import Document  # noqa: F401 — registers tables
 from src.modules.documents.router import router as documents_router
 from src.modules.auth.router import router as auth_router
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    if os.getenv("APP_ENV", "local") in {"local", "dev"}:
-        Base.metadata.create_all(bind=engine)
-    yield
-
-
-app = FastAPI(title="Project Dashboard API", lifespan=lifespan)
+app = FastAPI(title="Project Dashboard API")
 app.include_router(documents_router)
 app.include_router(auth_router)
 
