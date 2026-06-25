@@ -13,10 +13,31 @@ jobs:
   backend:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: project_dashboard
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+      
     defaults:
       run:
         working-directory: ./backend
 
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/project_dashboard
+      SECRET_KEY: ci-secret-key-for-testing-only
+      ALGORITHM: HS256
+      APP_ENV: local
+      
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -35,4 +56,6 @@ jobs:
       
       - name: Format check (ruff)
         run: uv run ruff format --check .
-    
+
+      - name: Run tests
+        run: uv run pytest
