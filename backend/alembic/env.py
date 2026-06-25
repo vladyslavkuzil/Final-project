@@ -1,20 +1,19 @@
 import os
 import sys
 from logging.config import fileConfig
+from src.core.base import Base
+from sqlalchemy import engine_from_config
+from sqlalchemy import pool
+from alembic import context
+from dotenv import load_dotenv
 
 # Add backend directory to sys.path so 'src' namespace is discoverable
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
-from src.core.base import Base
 # Import models to register them on Base.metadata for autogenerate
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
-
-from alembic import context
-from dotenv import load_dotenv
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
