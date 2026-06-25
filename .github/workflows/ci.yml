@@ -58,8 +58,7 @@ jobs:
         run: uv run ruff format --check .
       
       - name: Run Alembic migrations
-        working-directory: .
-        run: uv run alembic -c backend/alembic.ini upgrade head
+        run: uv run alembic -c alembic.ini upgrade head
 
       - name: Run tests
         run: uv run python -m pytest
