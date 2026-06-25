@@ -14,17 +14,6 @@ from .exceptions import (
 )
 
 
-# def get_or_create_user(db: Session, user_id: str) -> User:
-#     user = db.query(User).filter(User.id == user_id).one_or_none()
-
-#     if user is None:
-#         user = User(id=user_id)
-#         db.add(user)
-#         db.flush()
-
-#     return user
-
-
 def get_project_by_id(db: Session, project_id: str, user_id: str) -> Project | None:
     """Return a single Project object by its primary key(uuid) available for user_id, None if no project is found.
 
@@ -77,14 +66,7 @@ def get_project_by_name(db: Session, name: str, user_id: str) -> Project | None:
     Returns:
         The matching Project object, or None if no row is found.
     """
-    return (
-        db.query(Project)
-        .filter(
-            Project.name == name,
-            Project.users.any(User.id == user_id),
-        )
-        .one_or_none()
-    )
+    return db.query(Project).filter(Project.name == name).one_or_none()
 
 
 def get_project_by_name_admin(db: Session, name: str, user_id: str) -> Project | None:

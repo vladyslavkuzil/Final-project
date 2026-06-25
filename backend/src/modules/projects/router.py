@@ -55,7 +55,7 @@ def list_projects(
 
 
 @router.get(
-    "/project_id/{project_id}/info",
+    "/project/{project_id}/info",
     response_model=schemas.ProjectResponse,
 )
 def retrieve_project_id(
@@ -74,7 +74,7 @@ def retrieve_project_id(
 
 
 @router.get(
-    "/project_name/{project_name}/info",
+    "/project/by-name/{project_name}/info",
     response_model=schemas.ProjectResponse,
 )
 def retrieve_project_name(
