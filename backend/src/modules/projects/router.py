@@ -82,7 +82,7 @@ def retrieve_project_name(
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
-    project = services.get_project_by_name(db, project_name, current_user)
+    project = services.get_project_by_name(db, project_name)
 
     if project is None:
         raise HTTPException(
