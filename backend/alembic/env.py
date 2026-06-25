@@ -9,9 +9,6 @@ if backend_dir not in sys.path:
 
 from src.core.base import Base
 # Import models to register them on Base.metadata for autogenerate
-from src.modules.auth.models import User
-from src.modules.projects.models import Project
-from src.modules.documents.models import Document
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
@@ -36,7 +33,6 @@ config.set_main_option("sqlalchemy.url", db_url)
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 target_metadata = Base.metadata
-
 
 
 # other values from the config, defined by the needs of env.py,
@@ -83,9 +79,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()
