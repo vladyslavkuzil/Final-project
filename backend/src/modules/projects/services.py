@@ -56,7 +56,7 @@ def get_project_by_id_admin(
     )
 
 
-def get_project_by_name(db: Session, name: str, user_id: str) -> Project | None:
+def get_project_by_name(db: Session, name: str) -> Project | None:
     """Return a single Project object by its name, None if no project is found.
 
     Args:

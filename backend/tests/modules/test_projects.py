@@ -65,7 +65,7 @@ class ProjectServiceUnitTests(unittest.TestCase):
         expected = SimpleProject(name="project-1")
         self.db.query.return_value = make_query(expected)
 
-        project = services.get_project_by_name(self.db, "project-1", "admin-id")
+        project = services.get_project_by_name(self.db, "project-1")
 
         self.assertIs(project, expected)
         self.db.query.assert_called_once()

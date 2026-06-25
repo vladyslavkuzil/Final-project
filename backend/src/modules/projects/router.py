@@ -55,7 +55,7 @@ def list_projects(
 
 
 @router.get(
-    "/project/{project_id}/info",
+    "/project/by-id/{project_id}/info",
     response_model=schemas.ProjectResponse,
 )
 def retrieve_project_id(
@@ -143,7 +143,7 @@ def delete_project(
 
 
 @router.post(
-    "/project/{project_id}/invite",
+    "/project/{project_id}/invite/{user_id}",
     response_model=schemas.ProjectResponse,
 )
 def invite_user(
