@@ -18,7 +18,6 @@ if backend_dir not in sys.path:
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-print(Base.metadata.tables)
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:
@@ -26,6 +25,9 @@ if config.config_file_name is not None:
 
 load_dotenv()
 db_url = os.getenv("DATABASE_URL")
+
+if db_url is None:
+    raise RuntimeError("DATABASE_URL environment variable is not set.")
 config.set_main_option("sqlalchemy.url", db_url)
 # add your model's MetaData object here
 # for 'autogenerate' support

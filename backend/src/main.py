@@ -8,15 +8,6 @@ from src.modules.documents.models import Document  # noqa: F401 — registers ta
 from src.modules.documents.router import router as documents_router
 from src.modules.auth.router import router as auth_router
 
-
-# @asynccontextmanager
-# async def lifespan(app: FastAPI):
-#     if os.getenv("APP_ENV", "local") in {"local", "dev"}:
-#         Base.metadata.create_all(bind=engine)
-#     yield
-
-print(Base.metadata.tables)
-
 app = FastAPI(title="Project Dashboard API")
 app.include_router(documents_router)
 app.include_router(auth_router)
