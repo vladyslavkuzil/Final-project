@@ -231,30 +231,22 @@ def no_auth():
     # override_auth teardown (autouse) handles any remaining cleanup
 
 
-def test_list_documents_without_token_returns_401(
-    client: TestClient, no_auth
-):
+def test_list_documents_without_token_returns_401(client: TestClient, no_auth):
     response = client.get(f"/project/{NONEXISTENT_PROJECT_ID}/documents")
     assert response.status_code == 401
 
 
-def test_download_document_without_token_returns_401(
-    client: TestClient, no_auth
-):
+def test_download_document_without_token_returns_401(client: TestClient, no_auth):
     response = client.get("/document/any-id")
     assert response.status_code == 401
 
 
-def test_update_document_without_token_returns_401(
-    client: TestClient, no_auth
-):
+def test_update_document_without_token_returns_401(client: TestClient, no_auth):
     response = client.put("/document/any-id", json={"title": "x"})
     assert response.status_code == 401
 
 
-def test_delete_document_without_token_returns_401(
-    client: TestClient, no_auth
-):
+def test_delete_document_without_token_returns_401(client: TestClient, no_auth):
     response = client.delete("/document/any-id")
     assert response.status_code == 401
 

@@ -13,7 +13,7 @@ if backend_dir not in sys.path:
 
 
 # Import models to register them on Base.metadata for autogenerate
-from src.core.base import Base # noqa: E402, F401
+from src.core.base import Base  # noqa: E402, F401
 from src.modules.auth.models import User  # noqa: E402, F401
 from src.modules.projects.models import Project  # noqa: E402, F401
 from src.modules.documents.models import Document  # noqa: E402, F401
