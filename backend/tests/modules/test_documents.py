@@ -2,13 +2,33 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-PROJECT_ID = "test-proj-documents"
+from src.modules.auth.models import User
+from src.modules.projects.models import Project
+
+NONEXISTENT_PROJECT_ID = "does-not-exist-project"
 
 
 @pytest.fixture
-def created_doc(client: TestClient, db: Session) -> dict:
+def seeded_project(db: Session) -> Project:
+    user = User(
+        id="user-999",
+        email="doctest@example.com",
+        hashed_password="x",
+        is_active=True,
+    )
+    db.add(user)
+    db.flush()
+    project = Project(name="test-project-for-docs", admin_id="user-999")
+    project.users.append(user)
+    db.add(project)
+    db.flush()
+    return project
+
+
+@pytest.fixture
+def created_doc(client: TestClient, db: Session, seeded_project: Project) -> dict:
     r = client.post(
-        f"/project/{PROJECT_ID}/documents",
+        f"/project/{seeded_project.id}/documents",
         json={"title": "Fixture Doc", "file_path": "/f/fixture.pdf"},
     )
     assert r.status_code == 201
@@ -31,12 +51,12 @@ def override_auth():
 
 
 def test_list_documents_with_existing_doc_returns_200(
-    client: TestClient, created_doc: dict
+    client: TestClient, created_doc: dict, seeded_project: Project
 ):
     # Arrange — document seeded via fixture
 
     # Act
-    response = client.get(f"/project/{PROJECT_ID}/documents")
+    response = client.get(f"/project/{seeded_project.id}/documents")
 
     # Assert
     assert response.status_code == 200
@@ -48,28 +68,32 @@ def test_list_documents_with_existing_doc_returns_200(
 # ---------------------------------------------------------------------------
 
 
-def test_create_document_valid_payload_returns_201(client: TestClient, db: Session):
+def test_create_document_valid_payload_returns_201(
+    client: TestClient, db: Session, seeded_project: Project
+):
     # Arrange
     payload = {"title": "New Doc", "file_path": "/f/new.pdf"}
 
     # Act
-    response = client.post("/project/proj-create/documents", json=payload)
+    response = client.post(f"/project/{seeded_project.id}/documents", json=payload)
 
     # Assert
     assert response.status_code == 201
     data = response.json()
     assert data["title"] == "New Doc"
-    assert data["project_id"] == "proj-create"
+    assert data["project_id"] == seeded_project.id
     assert data["uploaded_by"] == "user-999"
     assert all(k in data for k in ("id", "created_at", "updated_at"))
 
 
-def test_create_document_disallowed_extension_returns_422(client: TestClient):
+def test_create_document_disallowed_extension_returns_422(
+    client: TestClient, seeded_project: Project
+):
     # Arrange
     payload = {"title": "Bad File", "file_path": "/f/malware.exe"}
 
     # Act
-    response = client.post("/project/proj-create/documents", json=payload)
+    response = client.post(f"/project/{seeded_project.id}/documents", json=payload)
 
     # Assert
     assert response.status_code == 422
@@ -94,11 +118,11 @@ def test_download_document_existing_id_returns_200(
 
 
 def test_download_document_content_disposition_exposes_only_basename(
-    client: TestClient, db: Session
+    client: TestClient, db: Session, seeded_project: Project
 ):
     # Arrange — file_path contains a deep internal path
     r = client.post(
-        "/project/proj-dl/documents",
+        f"/project/{seeded_project.id}/documents",
         json={"title": "Path Doc", "file_path": "/internal/secrets/report.pdf"},
     )
     doc_id = r.json()["id"]
@@ -210,7 +234,7 @@ def no_auth():
 def test_list_documents_without_token_returns_401(
     client: TestClient, no_auth
 ):
-    response = client.get(f"/project/{PROJECT_ID}/documents")
+    response = client.get(f"/project/{NONEXISTENT_PROJECT_ID}/documents")
     assert response.status_code == 401
 
 
@@ -233,3 +257,41 @@ def test_delete_document_without_token_returns_401(
 ):
     response = client.delete("/document/any-id")
     assert response.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# 404 — nonexistent project_id must be rejected on project-scoped endpoints
+# ---------------------------------------------------------------------------
+
+
+def test_list_documents_nonexistent_project_returns_404(client: TestClient):
+    response = client.get(f"/project/{NONEXISTENT_PROJECT_ID}/documents")
+    assert response.status_code == 404
+
+
+def test_upload_document_nonexistent_project_returns_404(client: TestClient):
+    response = client.post(
+        f"/project/{NONEXISTENT_PROJECT_ID}/documents",
+        json={"title": "Doc", "file_path": "/f/file.pdf"},
+    )
+    assert response.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Cascade delete — removing a project must remove its documents
+# ---------------------------------------------------------------------------
+
+
+def test_delete_project_removes_its_documents(
+    client: TestClient, created_doc: dict, seeded_project: Project
+):
+    # Arrange — document exists and is reachable
+    doc_id = created_doc["id"]
+    assert client.get(f"/document/{doc_id}").status_code == 200
+
+    # Act — delete the parent project
+    response = client.delete(f"/project/{seeded_project.id}")
+    assert response.status_code == 200
+
+    # Assert — document is gone, no orphan remains
+    assert client.get(f"/document/{doc_id}").status_code == 404
