@@ -1,7 +1,6 @@
 import os
 import sys
 from logging.config import fileConfig
-from src.core.base import Base
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from alembic import context
@@ -12,8 +11,12 @@ backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
-# Import models to register them on Base.metadata for autogenerate
 
+# Import models to register them on Base.metadata for autogenerate
+from src.core.base import Base # noqa: E402, F401
+from src.modules.auth.models import User  # noqa: E402, F401
+from src.modules.projects.models import Project  # noqa: E402, F401
+from src.modules.documents.models import Document  # noqa: E402, F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
