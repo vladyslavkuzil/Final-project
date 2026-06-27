@@ -221,14 +221,13 @@ def test_delete_document_nonexistent_id_returns_404(client: TestClient):
 
 
 @pytest.fixture
-def no_auth():
+def no_auth(override_auth):
     """Remove the autouse auth override so the real JWT validation runs."""
     from src.main import app
     from src.core.security import get_current_user
 
     app.dependency_overrides.pop(get_current_user, None)
     yield
-    # override_auth teardown (autouse) handles any remaining cleanup
 
 
 def test_list_documents_without_token_returns_401(client: TestClient, no_auth):
