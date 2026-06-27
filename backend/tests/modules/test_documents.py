@@ -189,3 +189,47 @@ def test_delete_document_nonexistent_id_returns_404(client: TestClient):
 
     # Assert
     assert response.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# 401 — unauthenticated requests must be rejected on all endpoints
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def no_auth():
+    """Remove the autouse auth override so the real JWT validation runs."""
+    from src.main import app
+    from src.core.security import get_current_user
+
+    app.dependency_overrides.pop(get_current_user, None)
+    yield
+    # override_auth teardown (autouse) handles any remaining cleanup
+
+
+def test_list_documents_without_token_returns_401(
+    client: TestClient, no_auth
+):
+    response = client.get(f"/project/{PROJECT_ID}/documents")
+    assert response.status_code == 401
+
+
+def test_download_document_without_token_returns_401(
+    client: TestClient, no_auth
+):
+    response = client.get("/document/any-id")
+    assert response.status_code == 401
+
+
+def test_update_document_without_token_returns_401(
+    client: TestClient, no_auth
+):
+    response = client.put("/document/any-id", json={"title": "x"})
+    assert response.status_code == 401
+
+
+def test_delete_document_without_token_returns_401(
+    client: TestClient, no_auth
+):
+    response = client.delete("/document/any-id")
+    assert response.status_code == 401

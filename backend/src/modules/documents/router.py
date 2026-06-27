@@ -25,6 +25,7 @@ def _safe_filename(file_path: str) -> str:
 def list_documents(
     project_id: str,
     db: Session = Depends(get_db),
+    _: str = Depends(get_current_user),
 ):
     return services.get_documents_by_project(db, project_id)
 
@@ -49,6 +50,7 @@ def upload_document(
 def download_document(
     document_id: str,
     db: Session = Depends(get_db),
+    _: str = Depends(get_current_user),
 ):
     doc = services.get_document(db, document_id)
     if not doc:
@@ -73,6 +75,7 @@ def update_document(
     document_id: str,
     payload: DocumentUpdate,
     db: Session = Depends(get_db),
+    _: str = Depends(get_current_user),
 ):
     doc = services.update_document(db, document_id, payload.title, payload.file_path)
     if not doc:
@@ -86,6 +89,7 @@ def update_document(
 def delete_document(
     document_id: str,
     db: Session = Depends(get_db),
+    _: str = Depends(get_current_user),
 ):
     if not services.delete_document(db, document_id):
         raise HTTPException(
