@@ -1,6 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel, Field, EmailStr
-
+from src.modules.project_membership.models import MembershipRole
 
 class ProjectCreate(BaseModel):
     name: str = Field(max_length=255)
@@ -31,5 +31,5 @@ class ProjectResponse(BaseModel):
     is_finished: bool
     admin: UserResponse
     users: list[UserResponse]
-
+    current_user_role:MembershipRole
     model_config = {"from_attributes": True}

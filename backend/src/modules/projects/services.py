@@ -7,6 +7,9 @@ Handles all CRUD operations for projects.
 from sqlalchemy.orm import Session
 from src.modules.projects.models import Project
 from src.modules.auth.models import User
+from src.modules.project_membership.models import ProjectMembership,MembershipRole
+
+
 from .exceptions import (
     ProjectNotFoundError,
     ProjectAlreadyExistsError,
@@ -24,14 +27,18 @@ def get_project_by_id(db: Session, project_id: str, user_id: str) -> Project | N
     Returns:
         The matching Project object, or None if no row is found.
     """
-    return (
-        db.query(Project)
-        .filter(
-            Project.id == project_id,
-            Project.users.any(User.id == user_id),
-        )
-        .one_or_none()
-    )
+    project_membership=db.query(ProjectMembership).filter(
+            ProjectMembership.project_id == project_id,
+            ProjectMembership.user_id == user_id
+        ).one_or_none()
+    
+    if project_membership is None:
+        return None
+    
+    project=db.query(Project).filter(Project.id==project_id).one_or_none()
+    project.current_user_role=project_membership.role
+
+    return project
 
 
 def get_project_by_id_admin(
@@ -89,7 +96,7 @@ def get_project_by_name_admin(db: Session, name: str, user_id: str) -> Project |
     )
 
 
-def create_project(
+def _create_project(
     db: Session, name: str, admin_id: str, description: str | None = None
 ) -> Project:
     """Create a new project and return it refreshed from the database.
@@ -118,17 +125,33 @@ def create_project(
         description=description,
         admin_id=admin.id,
     )
-
     project.users.append(admin)
 
     try:
         db.add(project)
+        db.flush()
+    except Exception:
+        db.rollback()
+        raise
+
+    return project
+
+def create_project(db: Session, name: str, admin_id: str, description: str | None = None
+):
+    try:
+        project = _create_project(db, name, admin_id, description)
+        project_membership = ProjectMembership(project_id=project.id, user_id=admin_id, role=MembershipRole.OWNER)
+
+        db.add(project_membership)
         db.commit()
     except Exception:
         db.rollback()
         raise
 
     db.refresh(project)
+
+    project.current_user_role=project_membership.role
+
     return project
 
 
