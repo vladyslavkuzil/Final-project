@@ -290,11 +290,13 @@ def add_user_to_project(db: Session, user_id: str, project_id: str, admin_id: st
         .one_or_none()
     )
     if existing_membership is None:
-        db.add(ProjectMembership(
-            project_id=project_id,
-            user_id=user_id,
-            role=MembershipRole.PARTICIPANT,
-        ))
+        db.add(
+            ProjectMembership(
+                project_id=project_id,
+                user_id=user_id,
+                role=MembershipRole.PARTICIPANT,
+            )
+        )
 
     try:
         db.commit()

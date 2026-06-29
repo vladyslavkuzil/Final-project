@@ -12,9 +12,9 @@ _ROLE_RANK = {MembershipRole.PARTICIPANT: 1, MembershipRole.OWNER: 2}
 
 def require_role(required_role: MembershipRole | None = None):
     def _check_access(
-            project_id: str,
-            db: Session = Depends(get_db),
-            user_id: str = Depends(get_current_user),
+        project_id: str,
+        db: Session = Depends(get_db),
+        user_id: str = Depends(get_current_user),
     ) -> MembershipRole:
         exists = db.query(Project.id).filter(Project.id == project_id).first()
         if not exists:
@@ -34,13 +34,14 @@ def require_role(required_role: MembershipRole | None = None):
         if required_role and _ROLE_RANK[membership.role] < _ROLE_RANK[required_role]:
             raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Access denied")
         return membership.role
+
     return _check_access
 
 
 def get_project_or_404(
-        project_id: str,
-        db: Session = Depends(get_db),
-        user_id: str = Depends(get_current_user),
+    project_id: str,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user),
 ) -> str:
     exists = db.query(Project.id).filter(Project.id == project_id).first()
     if not exists:
