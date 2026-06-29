@@ -1,6 +1,6 @@
+import enum
 import uuid
 from datetime import datetime
-import enum
 
 from sqlalchemy import String, Enum, DateTime, func, UniqueConstraint, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
@@ -19,8 +19,8 @@ class ProjectMembership(Base):
     id: Mapped[str] = mapped_column(
         String, primary_key=True, default=lambda: str(uuid.uuid4())
     )
-    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
 
     role: Mapped[MembershipRole] = mapped_column(Enum(MembershipRole), nullable=False)
     created_at: Mapped[datetime] = mapped_column(

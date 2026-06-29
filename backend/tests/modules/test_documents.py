@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from src.modules.auth.models import User
+from src.modules.project_membership.models import ProjectMembership, MembershipRole
 from src.modules.projects.models import Project
 
 NONEXISTENT_PROJECT_ID = "does-not-exist-project"
@@ -21,6 +22,11 @@ def seeded_project(db: Session) -> Project:
     project = Project(name="test-project-for-docs", admin_id="user-999")
     project.users.append(user)
     db.add(project)
+    db.flush()
+    membership = ProjectMembership(
+        project_id=project.id, user_id="user-999", role=MembershipRole.OWNER
+    )
+    db.add(membership)
     db.flush()
     return project
 
