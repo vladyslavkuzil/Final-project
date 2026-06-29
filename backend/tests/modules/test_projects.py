@@ -86,6 +86,7 @@ class ProjectServiceUnitTests(unittest.TestCase):
 
     def test_get_all_projects_returns_cached_projects(self):
         import json
+
         expected_serialized = [{"id": "proj-1"}, {"id": "proj-2"}]
         self.mock_redis.get.return_value = json.dumps(expected_serialized)
 
