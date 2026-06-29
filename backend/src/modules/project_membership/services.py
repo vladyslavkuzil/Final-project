@@ -1,4 +1,4 @@
-from src.modules.project_membership.models import MembershipRole,ProjectMembership
+from src.modules.project_membership.models import ProjectMembership
 from sqlalchemy.orm import Session
 
 def get_user_role(project_id:str,user_id:str,db:Session):

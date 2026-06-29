@@ -31,5 +31,5 @@ class ProjectResponse(BaseModel):
     is_finished: bool
     admin: UserResponse
     users: list[UserResponse]
-    current_user_role:MembershipRole
+    user_role: MembershipRole | None = None
     model_config = {"from_attributes": True}

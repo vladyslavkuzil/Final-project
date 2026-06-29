@@ -17,8 +17,8 @@ from .exceptions import (
 )
 
 
-def get_project_by_id(db: Session, project_id: str, user_id: str) -> Project | None:
-    """Return a single Project object by its primary key(uuid) available for user_id, None if no project is found.
+def get_project_by_id(db: Session, project_id: str) -> Project | None:
+    """Return a single Project object by its primary key(uuid).
 
     Args:
         db: Active SQLAlchemy session,
@@ -27,17 +27,7 @@ def get_project_by_id(db: Session, project_id: str, user_id: str) -> Project | N
     Returns:
         The matching Project object, or None if no row is found.
     """
-    project_membership=db.query(ProjectMembership).filter(
-            ProjectMembership.project_id == project_id,
-            ProjectMembership.user_id == user_id
-        ).one_or_none()
-    
-    if project_membership is None:
-        return None
-    
     project=db.query(Project).filter(Project.id==project_id).one_or_none()
-    project.current_user_role=project_membership.role
-
     return project
 
 
@@ -97,7 +87,7 @@ def get_project_by_name_admin(db: Session, name: str, user_id: str) -> Project |
 
 
 def _create_project(
-    db: Session, name: str, admin_id: str, description: str | None = None
+    db: Session, name: str, description: str | None = None, admin_id: str | None = None
 ) -> Project:
     """Create a new project and return it refreshed from the database.
 
@@ -105,6 +95,7 @@ def _create_project(
         db: Active SQLAlchemy session,
         name: Unique project name,
         description: Project description (null/empty allowed)
+        admin_id: ID of the user creating the project (kept for backward compat)
 
     Returns:
         The newly created Project object
@@ -116,17 +107,12 @@ def _create_project(
     if existing_project:
         raise ProjectAlreadyExistsError(existing_project.name)
 
-    admin = db.query(User).filter(User.id == admin_id).one_or_none()
-    if admin is None:
-        raise UserNotFoundError(admin_id)
 
     project = Project(
         name=name,
         description=description,
-        admin_id=admin.id,
+        admin_id=admin_id,
     )
-    project.users.append(admin)
-
     try:
         db.add(project)
         db.flush()
@@ -136,11 +122,33 @@ def _create_project(
 
     return project
 
-def create_project(db: Session, name: str, admin_id: str, description: str | None = None
-):
+def create_project(db: Session, name: str, user_id: str, description: str | None = None
+) -> Project:
+    """Create a new project, assign the creator as OWNER, and return it.
+
+    Args:
+        db: Active SQLAlchemy session.
+        name: Unique project name.
+        user_id: ID of the authenticated user creating the project.
+        description: Optional project description.
+
+    Returns:
+        The newly created Project with ``user_role`` set to
+        ``MembershipRole.OWNER``.
+
+    Raises:
+        ProjectAlreadyExistsError: If a project with that name already exists.
+        UserNotFoundError: If the creator user is not found in the database.
+    """
     try:
-        project = _create_project(db, name, admin_id, description)
-        project_membership = ProjectMembership(project_id=project.id, user_id=admin_id, role=MembershipRole.OWNER)
+        project = _create_project(db, name, description, admin_id=user_id)
+        project_membership = ProjectMembership(project_id=project.id, user_id=user_id, role=MembershipRole.OWNER)
+
+        user = db.query(User).filter(User.id == user_id).one_or_none()
+        if user is None:
+            raise UserNotFoundError(user_id)
+        if user not in project.users:
+            project.users.append(user)
 
         db.add(project_membership)
         db.commit()
@@ -150,7 +158,7 @@ def create_project(db: Session, name: str, admin_id: str, description: str | Non
 
     db.refresh(project)
 
-    project.current_user_role=project_membership.role
+    project.user_role = project_membership.role
 
     return project
 
@@ -179,17 +187,19 @@ def update_project(
     """Update mutable Project object fields.
 
     Args:
-        db: Active SQLAlchemy session,
-        name: New unique project name,
-        description: New project description,
+        db: Active SQLAlchemy session.
+        project_id: Unique project UUID string.
+        user_id: ID of the user performing the update (must be owner).
+        name: New unique project name.
+        description: New project description.
         is_finished: Mark project as done.
 
     Returns:
-        The updated and refreshed Project from the database,
+        The updated and refreshed Project from the database.
 
     Raises:
-        ProjectNotFoundError - if project is not found.
-        ProjectAlreadyExistsError - if project name already in use.
+        ProjectNotFoundError: If the project is not found or user is not the owner.
+        ProjectAlreadyExistsError: If the new name is already in use.
     """
     project = get_project_by_id_admin(db, project_id, user_id)
     if project is None:
@@ -218,17 +228,18 @@ def update_project(
 
 
 def delete_project(db: Session, project_id: str, user_id: str) -> dict:
-    """Removes project from a database.
+    """Remove a project from the database.
 
     Args:
-        db: Active SQLAlchemy session,
+        db: Active SQLAlchemy session.
         project_id: Unique project UUID string.
+        user_id: ID of the user performing the deletion (must be owner).
 
     Returns:
-        True if project is deleted.
+        A dict with a confirmation message.
 
     Raises:
-        ProjectNotFoundError - if project is not found.
+        ProjectNotFoundError: If the project is not found or user is not the owner.
     """
     project = get_project_by_id_admin(db, project_id, user_id)
     if project is None:

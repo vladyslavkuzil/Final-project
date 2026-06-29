@@ -13,9 +13,9 @@ def require_role(required_role:MembershipRole|None=None):
     def _check_access (
         project_id: str,
         db: Session = Depends(get_db),
-        current_user_id: str = Depends(get_current_user),
+        user_id: str = Depends(get_current_user),
     )->MembershipRole:
-        user_role = get_user_role(project_id, current_user_id, db)
+        user_role = get_user_role(project_id, user_id, db)
         if user_role is None:
             raise HTTPException(status.HTTP_403_FORBIDDEN)
         
