@@ -1,15 +1,10 @@
-import enum
 import uuid
 from datetime import datetime
 
 from sqlalchemy import String, Enum, DateTime, func, UniqueConstraint, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from src.core.base import Base
-
-
-class MembershipRole(str, enum.Enum):
-    OWNER = "owner"
-    PARTICIPANT = "participant"
+from src.core.enums import MembershipRole
 
 
 class ProjectMembership(Base):

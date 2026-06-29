@@ -6,7 +6,8 @@ Handles all CRUD operations for projects.
 
 from sqlalchemy.orm import Session
 from src.modules.auth.models import User
-from src.modules.project_membership.models import ProjectMembership, MembershipRole
+from src.core.enums import MembershipRole
+from src.modules.project_membership.models import ProjectMembership
 from src.modules.projects.models import Project
 
 from .exceptions import (
@@ -86,7 +87,7 @@ def get_project_by_name_admin(db: Session, name: str, user_id: str) -> Project |
 
 
 def _create_project(
-    db: Session, name: str, description: str | None = None, admin_id: str | None = None
+    db: Session, name: str, description: str | None = None, admin_id: str = ""
 ) -> Project:
     """Create a new project and return it refreshed from the database.
 
@@ -111,13 +112,8 @@ def _create_project(
         description=description,
         admin_id=admin_id,
     )
-    try:
-        db.add(project)
-        db.flush()
-    except Exception:
-        db.rollback()
-        raise
-
+    db.add(project)
+    db.flush()
     return project
 
 
@@ -141,14 +137,15 @@ def create_project(
         UserNotFoundError: If the creator user is not found in the database.
     """
     try:
+        user = db.query(User).filter(User.id == user_id).one_or_none()
+        if user is None:
+            raise UserNotFoundError(user_id)
+
         project = _create_project(db, name, description, admin_id=user_id)
         project_membership = ProjectMembership(
             project_id=project.id, user_id=user_id, role=MembershipRole.OWNER
         )
 
-        user = db.query(User).filter(User.id == user_id).one_or_none()
-        if user is None:
-            raise UserNotFoundError(user_id)
         if user not in project.users:
             project.users.append(user)
 
@@ -283,6 +280,21 @@ def add_user_to_project(db: Session, user_id: str, project_id: str, admin_id: st
 
     if user not in project.users:
         project.users.append(user)
+
+    existing_membership = (
+        db.query(ProjectMembership)
+        .filter(
+            ProjectMembership.project_id == project_id,
+            ProjectMembership.user_id == user_id,
+        )
+        .one_or_none()
+    )
+    if existing_membership is None:
+        db.add(ProjectMembership(
+            project_id=project_id,
+            user_id=user_id,
+            role=MembershipRole.PARTICIPANT,
+        ))
 
     try:
         db.commit()

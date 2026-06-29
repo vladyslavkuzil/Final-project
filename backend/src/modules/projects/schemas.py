@@ -1,6 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel, Field, EmailStr
-from src.modules.project_membership.models import MembershipRole
+from src.core.enums import MembershipRole
 
 
 class ProjectCreate(BaseModel):
