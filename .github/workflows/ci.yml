@@ -56,6 +56,9 @@ jobs:
       
       - name: Format check (ruff)
         run: uv run ruff format --check .
+      
+      - name: Run Alembic migrations
+        run: uv run alembic -c alembic.ini upgrade head
 
       - name: Run tests
-        run: uv run pytest
+        run: uv run python -m pytest
