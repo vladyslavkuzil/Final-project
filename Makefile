@@ -3,6 +3,9 @@
 dev:
 	docker compose --profile dev up --build
 
+dev-detached:
+	docker compose --profile dev up --build -d
+	
 down:
 	docker compose --profile dev down
 

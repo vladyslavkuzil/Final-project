@@ -4,9 +4,14 @@ Projects service layer.
 Handles all CRUD operations for projects.
 """
 
+import json
+from pydantic import TypeAdapter
 from sqlalchemy.orm import Session
 from src.modules.projects.models import Project
 from src.modules.auth.models import User
+from src.core.config import CACHE_TTL
+from src.core.cache import redis_client
+from src.modules.projects.schemas import ProjectResponse
 from .exceptions import (
     ProjectNotFoundError,
     ProjectAlreadyExistsError,
@@ -24,7 +29,14 @@ def get_project_by_id(db: Session, project_id: str, user_id: str) -> Project | N
     Returns:
         The matching Project object, or None if no row is found.
     """
-    return (
+
+    cache_key = f"user:{user_id}:project:{project_id}"
+
+    cached = redis_client.get(cache_key)
+    if cached:
+        return json.loads(cached)
+
+    project = (
         db.query(Project)
         .filter(
             Project.id == project_id,
@@ -32,6 +44,21 @@ def get_project_by_id(db: Session, project_id: str, user_id: str) -> Project | N
         )
         .one_or_none()
     )
+
+    if project:
+        adapter = TypeAdapter(ProjectResponse)
+        serialized_project = adapter.validate_python(project)
+        serialized_project = adapter.dump_python(serialized_project, mode="json")
+
+        redis_client.setex(
+            cache_key,
+            CACHE_TTL,
+            json.dumps(serialized_project),
+        )
+
+        return serialized_project
+
+    return None
 
 
 def get_project_by_id_admin(
@@ -129,20 +156,34 @@ def create_project(
         raise
 
     db.refresh(project)
+    for u in project.users:
+        redis_client.delete(f"user:{u.id}:projects")
+
     return project
 
 
-def get_all_projects(db: Session, user_id: str) -> list[Project]:
-    """Return a list of all Projects available for user.
+def get_all_projects(db: Session, user_id: str):
 
-    Args:
-        db: Active SQLAlchemy session,
-        user_id: Current logged user.
+    cache_key = f"user:{user_id}:projects"
 
-    Returns:
-        Full list of all Projects objects.
-    """
-    return db.query(Project).filter(Project.users.any(User.id == user_id)).all()
+    cached = redis_client.get(cache_key)
+    if cached:
+        return json.loads(cached)
+
+    projects = db.query(Project).filter(Project.users.any(User.id == user_id)).all()
+
+    adapter = TypeAdapter(list[ProjectResponse])
+
+    serialized_projects = adapter.validate_python(projects)
+    serialized_projects = adapter.dump_python(serialized_projects, mode="json")
+
+    redis_client.setex(
+        cache_key,
+        CACHE_TTL,
+        json.dumps(serialized_projects),
+    )
+
+    return serialized_projects
 
 
 def update_project(
@@ -191,6 +232,10 @@ def update_project(
         raise
 
     db.refresh(project)
+    for u in project.users:
+        redis_client.delete(f"user:{u.id}:projects")
+    redis_client.delete(f"user:{user_id}:project:{project_id}")
+
     return project
 
 
@@ -211,12 +256,18 @@ def delete_project(db: Session, project_id: str, user_id: str) -> dict:
     if project is None:
         raise ProjectNotFoundError(project_id)
 
+    user_ids = [u.id for u in project.users]
+
     try:
         db.delete(project)
         db.commit()
     except Exception:
         db.rollback()
         raise
+
+    for uid in user_ids:
+        redis_client.delete(f"user:{uid}:projects")
+    redis_client.delete(f"user:{user_id}:project:{project_id}")
 
     return {"message": "Project deleted successfully"}
 
@@ -255,4 +306,7 @@ def add_user_to_project(db: Session, user_id: str, project_id: str, admin_id: st
         raise
 
     db.refresh(project)
+    for u in project.users:
+        redis_client.delete(f"user:{u.id}:projects")
+    redis_client.delete(f"user:{user_id}:project:{project_id}")
     return project

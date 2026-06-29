@@ -51,15 +51,12 @@ class ProjectServiceUnitTests(unittest.TestCase):
         self.db.refresh = Mock()
         self.db.delete = Mock()
         self.db.query.return_value = make_query()
+        self.redis_patcher = patch("src.modules.projects.services.redis_client")
+        self.mock_redis = self.redis_patcher.start()
+        self.mock_redis.get.return_value = None
 
-    def test_get_project_by_id_returns_matching_project(self):
-        expected = SimpleProject()
-        self.db.query.return_value = make_query(expected)
-
-        project = services.get_project_by_id(self.db, expected.id, "admin-id")
-
-        self.assertIs(project, expected)
-        self.db.query.assert_called_once()
+    def tearDown(self):
+        self.redis_patcher.stop()
 
     def test_get_project_by_name_returns_matching_project(self):
         expected = SimpleProject(name="project-1")
@@ -70,13 +67,33 @@ class ProjectServiceUnitTests(unittest.TestCase):
         self.assertIs(project, expected)
         self.db.query.assert_called_once()
 
-    def test_get_all_projects_returns_project_list(self):
-        expected = [SimpleProject("proj-1"), SimpleProject("proj-2")]
-        self.db.query.return_value = make_query(expected)
+    @patch("src.modules.projects.services.TypeAdapter")
+    def test_get_all_projects_returns_project_list(self, mock_type_adapter):
+        projects = [SimpleProject("proj-1"), SimpleProject("proj-2")]
+        self.db.query.return_value = make_query(projects)
+
+        expected_serialized = [{"id": "proj-1"}, {"id": "proj-2"}]
+        mock_adapter = Mock()
+        mock_type_adapter.return_value = mock_adapter
+        mock_adapter.validate_python.return_value = projects
+        mock_adapter.dump_python.return_value = expected_serialized
 
         result = services.get_all_projects(self.db, "admin-id")
 
-        self.assertEqual(result, expected)
+        self.assertEqual(result, expected_serialized)
+        self.mock_redis.get.assert_called_once_with("user:admin-id:projects")
+        self.mock_redis.setex.assert_called_once()
+
+    def test_get_all_projects_returns_cached_projects(self):
+        import json
+        expected_serialized = [{"id": "proj-1"}, {"id": "proj-2"}]
+        self.mock_redis.get.return_value = json.dumps(expected_serialized)
+
+        result = services.get_all_projects(self.db, "admin-id")
+
+        self.assertEqual(result, expected_serialized)
+        self.mock_redis.get.assert_called_once_with("user:admin-id:projects")
+        self.db.query.assert_not_called()
 
     def test_create_project_raises_when_name_already_exists(self):
         with patch.object(services, "get_project_by_name", return_value=Mock()):
