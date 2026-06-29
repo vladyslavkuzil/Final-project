@@ -1,8 +1,6 @@
 # Project Dashboard (Modular Monolith)
 
-Project Dashboard is a backend-first modular-monolith service to create, update, share, and manage project records and attached documents. This repository currently contains a minimal FastAPI application (health endpoint) and a Docker-based local development stack with PostgreSQL.
-
-Status: scaffolded — backend entrypoint, Dockerfile, and Docker Compose are present. Business logic, auth, and storage handlers will be added in subsequent iterations.
+Project Dashboard is a backend-first modular-monolith service to create, update, share, and manage project records and attached documents. The stack includes a FastAPI backend, a Next.js frontend, and a PostgreSQL database — all orchestrated with Docker Compose.
 
 Quick start
 -----------
@@ -14,11 +12,13 @@ cp .env.example .env
 # Edit .env to override defaults
 ```
 
-2. Build and start the stack with Docker Compose:
+2. Build and start the dev stack:
 
 ```bash
-docker compose -f compose.yml up --build
+make dev
 ```
+
+Migrations are applied automatically on startup via `entrypoint.sh`.
 
 3. Verify the API is running:
 
@@ -26,277 +26,131 @@ docker compose -f compose.yml up --build
 curl http://localhost:8000/health
 ```
 
+4. Frontend is available at `http://localhost:3000`.
+
 What is included
 -----------------
 
-- `backend/src/main.py` — minimal FastAPI app with a `/health` endpoint.
-- `Dockerfile` — builds a simple Python image for the backend.
-- `compose.yml` — starts the `api` and `db` services and persists Postgres data in a named volume.
-- `.env.example` — documents application and database environment variables to configure.
+- `backend/src/` — FastAPI application (auth, projects, documents modules).
+- `backend/Dockerfile` — builds the Python image for the backend.
+- `backend/entrypoint.sh` — runs `alembic upgrade head` before the app starts.
+- `frontend/` — Next.js application (Pages Router, TypeScript, Tailwind CSS).
+- `frontend/Dockerfile` — builds the Node image for the frontend.
+- `compose.yml` — defines `dev` and `test` profiles with separate databases.
+- `Makefile` — convenience commands for common tasks.
+- `.env.example` — documents all required environment variables.
+
+Make commands
+-------------
+
+| Command                        | Description                                      |
+| ------------------------------ | ------------------------------------------------ |
+| `make dev`                     | Build and start the dev stack (API + DB + frontend) |
+| `make down`                    | Stop and remove dev containers                   |
+| `make test`                    | Run the test suite against a separate test DB    |
+| `make down-test`               | Stop and remove test containers                  |
+| `make migrate`                 | Manually apply pending migrations                |
+| `make migration name="<msg>"`  | Generate a new Alembic migration                 |
+
+Docker profiles
+---------------
+
+- `dev` — API (with hot reload), PostgreSQL on port `5432`, frontend on port `3000`.
+- `test` — API runs pytest, separate PostgreSQL on port `5433`. Containers are removed after the run.
+
+You must pass the same profile to `down` as you used to start:
+
+```bash
+docker compose --profile dev down
+docker compose --profile test down
+```
 
 Environment variables
 ---------------------
 
-The project expects the following environment variables (see `.env.example`):
+All variables are documented in `.env.example`. Copy it to `.env` to get started. Key variables:
 
-- `APP_NAME`, `APP_ENV`, `APP_DEBUG`, `APP_HOST`, `APP_PORT`
-- `SECRET_KEY`, `ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES`
-- `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, `POSTGRES_PORT`, `DATABASE_URL`
+- `DATABASE_URL` / `TEST_DATABASE_URL` — connection strings for dev and test databases.
+- `SECRET_KEY`, `ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `REFRESH_TOKEN_EXPIRE_MINUTES` — JWT config.
+- `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` — Postgres credentials.
+- `NEXT_PUBLIC_API_URL` — backend URL exposed to the frontend browser.
 
-Running tests
--------------
-
-Requires the `db` service to be running. Run the suite inside the `api` container:
-
-```bash
-docker compose -f compose.yml up --build
-docker compose exec api uv run pytest tests/ -v
-```
-
-Notes & next steps
+Database Migrations
 -------------------
 
-- Keep your real secrets out of source control — use `.env` locally and secret stores in CI/CD.
-- Next tasks: add configuration loader (Pydantic `BaseSettings`), database models, Alembic migrations, and JWT auth.
+Migrations are applied automatically on every container startup. For manual control:
 
-# Database Migrations Guide
+### Generate a migration
 
-This document explains how to create, apply, and manage database migrations using **Alembic**.
-
-> ⚠️ **Important:** All commands must be run from the project root (`final-project/`).
-
----
-
-## 1. Create a New Migration
-
-Whenever you change your SQLAlchemy models (add/remove fields, create new tables, etc.), generate a migration:
+After changing a SQLAlchemy model, generate a migration from inside the running dev container:
 
 ```bash
-uv run alembic -c backend/alembic.ini revision --autogenerate -m "describe your change"
+make migration name="describe your change"
 ```
 
-### Explanation
+The file is created in `backend/alembic/versions/`. Always review it before applying.
 
-* `--autogenerate` → Alembic compares your SQLAlchemy models (`Base.metadata`) with the current database schema and generates migration operations automatically.
-* `-m "..."` → Adds a descriptive message to the migration (for example: `"add users table"`).
-
-A new migration file will be created in:
-
-```text
-backend/alembic/versions/
-```
-
----
-
-## 2. Apply Migrations
-
-Apply all pending migrations:
+### Apply migrations manually
 
 ```bash
-uv run alembic -c backend/alembic.ini upgrade head
+make migrate
 ```
 
-### Explanation
+### Roll back, check status, and other Alembic commands
 
-* `head` → The latest migration revision.
-
-You can also upgrade to a specific revision:
+Run these via `docker compose exec` while the dev stack is up:
 
 ```bash
-uv run alembic -c backend/alembic.ini upgrade <revision_id>
+# Roll back the last migration
+docker compose --profile dev exec api uv run alembic downgrade -1
+
+# Roll back to a specific revision
+docker compose --profile dev exec api uv run alembic downgrade <revision_id>
+
+# Show current revision
+docker compose --profile dev exec api uv run alembic current
+
+# Show migration history
+docker compose --profile dev exec api uv run alembic history --verbose
+
+# Mark DB as up-to-date without running migrations
+docker compose --profile dev exec api uv run alembic stamp head
 ```
 
-Example:
-
-```bash
-uv run alembic -c backend/alembic.ini upgrade a1b2c3d4
-```
-
----
-
-## 3. Roll Back Migrations
-
-Undo the most recently applied migration:
-
-```bash
-uv run alembic -c backend/alembic.ini downgrade -1
-```
-
-Roll back to a specific revision:
-
-```bash
-uv run alembic -c backend/alembic.ini downgrade <revision_id>
-```
-
-Example:
-
-```bash
-uv run alembic -c backend/alembic.ini downgrade a1b2c3d4
-```
-
----
-
-## 4. Check Migration Status
-
-Show the current database revision:
-
-```bash
-uv run alembic -c backend/alembic.ini current
-```
-
-Show migration history:
-
-```bash
-uv run alembic -c backend/alembic.ini history
-```
-
-Show migration history with details:
-
-```bash
-uv run alembic -c backend/alembic.ini history --verbose
-```
-
----
-
-## 5. Typical Workflow
-
-### Step 1: Update Models
-
-Make changes to your SQLAlchemy models in:
-
-```text
-backend/app/models/
-```
-
-### Step 2: Generate a Migration
-
-```bash
-uv run alembic -c backend/alembic.ini revision --autogenerate -m "your change"
-```
-
-### Step 3: Review the Generated Migration
-
-Open the generated file in:
-
-```text
-backend/alembic/versions/
-```
-
-Verify that Alembic generated the expected schema changes.
-
-### Step 4: Apply the Migration
-
-```bash
-uv run alembic -c backend/alembic.ini upgrade head
-```
-
-### Step 5: Verify Changes
-
-Confirm that the schema was updated correctly in PostgreSQL and that the application still works as expected.
-
----
-
-## 6. Best Practices
-
-* Always commit migration files (`backend/alembic/versions/*.py`) to Git.
-* Never modify old migrations that have already been shared or deployed.
-* Create a new migration for every schema change.
-* Keep `Base` centralized in `app/db/base.py`.
-* Ensure all models are imported in `alembic/env.py` so Alembic can detect schema changes.
-* Review autogenerated migrations before applying them.
-* Use clear, descriptive migration messages.
-* Test migrations locally before merging changes.
-
----
-
-## 7. Useful Commands Cheat Sheet
+### Alembic cheat sheet
 
 | Command                            | Description                                      |
 | ---------------------------------- | ------------------------------------------------ |
 | `revision --autogenerate -m "msg"` | Generate a new migration                         |
-| `upgrade head`                     | Apply latest migration                           |
+| `upgrade head`                     | Apply all pending migrations                     |
 | `upgrade <revision_id>`            | Upgrade to a specific revision                   |
-| `downgrade -1`                     | Roll back last migration                         |
+| `downgrade -1`                     | Roll back the last migration                     |
 | `downgrade <revision_id>`          | Roll back to a specific revision                 |
-| `current`                          | Show current database version                    |
-| `history`                          | Show migration history                           |
+| `current`                          | Show current database revision                   |
 | `history --verbose`                | Show detailed migration history                  |
 | `stamp head`                       | Mark DB as up-to-date without running migrations |
 
-Example:
+### Best practices
 
-```bash
-uv run alembic -c backend/alembic.ini stamp head
-```
+- Always commit migration files (`backend/alembic/versions/*.py`) to Git.
+- Never modify a migration that has already been applied in a shared environment.
+- Review autogenerated migrations before applying — Alembic doesn't always get it right.
+- Ensure all models are imported in `backend/alembic/env.py` so Alembic can detect changes.
 
----
+### Troubleshooting
 
-## 8. Troubleshooting
+**Alembic detects no changes** — make sure the model is imported in `backend/alembic/env.py` and inherits from the shared `Base`.
 
-### Alembic Detects No Changes
-
-Make sure:
-
-* The model is imported into Alembic's metadata configuration.
-* `target_metadata` is correctly set in `backend/alembic/env.py`.
-* The model inherits from the project's shared `Base`.
-
-### Migration Was Generated Incorrectly
-
-Delete the generated migration file and regenerate it:
+**Migration generated incorrectly** — delete the file and regenerate:
 
 ```bash
 rm backend/alembic/versions/<migration_file>.py
-uv run alembic -c backend/alembic.ini revision --autogenerate -m "correct migration"
+make migration name="correct description"
 ```
 
-### Database and Migration History Are Out of Sync
-
-Check current revision:
-
-```bash
-uv run alembic -c backend/alembic.ini current
-```
-
-Inspect migration history:
-
-```bash
-uv run alembic -c backend/alembic.ini history
-```
-
-If necessary, synchronize the database state:
-
-```bash
-uv run alembic -c backend/alembic.ini stamp head
-```
-
----
-
-## Quick Reference
-
-All commands must be executed from:
-
-```text
-final-project/
-```
-
-Most common workflow:
-
-```bash
-# 1. Update models
-# 2. Generate migration
-uv run alembic -c backend/alembic.ini revision --autogenerate -m "your change"
-
-# 3. Apply migration
-uv run alembic -c backend/alembic.ini upgrade head
-
-# 4. Verify database changes
-```
-
-
+**DB and migration history out of sync** — inspect with `current` and `history`, then use `stamp head` to realign if needed.
 
 License
 -------
 
 MIT (default) — replace or add a license file as appropriate.
-
