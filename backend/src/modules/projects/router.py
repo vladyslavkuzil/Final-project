@@ -20,9 +20,9 @@ router = APIRouter()
     status_code=status.HTTP_201_CREATED,
 )
 def create_project(
-        payload: schemas.ProjectCreate,
-        db: Session = Depends(get_db),
-        current_user: str = Depends(get_current_user),
+    payload: schemas.ProjectCreate,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
 ):
     try:
         return services.create_project(
@@ -48,8 +48,8 @@ def create_project(
     response_model=list[schemas.ProjectResponse],
 )
 def list_projects(
-        db: Session = Depends(get_db),
-        current_user: str = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
 ):
     return services.get_all_projects(db, current_user)
 
@@ -59,10 +59,9 @@ def list_projects(
     response_model=schemas.ProjectResponse,
 )
 def retrieve_project_id(
-        project_id: str,
-        db: Session = Depends(get_db),
-        user_role: MembershipRole = Depends(require_role()),
-
+    project_id: str,
+    db: Session = Depends(get_db),
+    user_role: MembershipRole = Depends(require_role()),
 ):
     project = services.get_project_by_id(db, project_id)
 
@@ -80,8 +79,8 @@ def retrieve_project_id(
     response_model=schemas.ProjectResponse,
 )
 def retrieve_project_name(
-        project_name: str,
-        db: Session = Depends(get_db),
+    project_name: str,
+    db: Session = Depends(get_db),
 ):
     project = services.get_project_by_name(db, project_name)
 
@@ -98,10 +97,10 @@ def retrieve_project_name(
     response_model=schemas.ProjectResponse,
 )
 def update_project(
-        project_id: str,
-        payload: schemas.ProjectUpdate,
-        db: Session = Depends(get_db),
-        current_user: str = Depends(get_current_user),
+    project_id: str,
+    payload: schemas.ProjectUpdate,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
 ):
     try:
         return services.update_project(
@@ -126,9 +125,9 @@ def update_project(
 
 @router.delete("/project/{project_id}")
 def delete_project(
-        project_id: str,
-        db: Session = Depends(get_db),
-        current_user: str = Depends(get_current_user),
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
 ):
     try:
         return services.delete_project(
@@ -148,10 +147,10 @@ def delete_project(
     response_model=schemas.ProjectResponse,
 )
 def invite_user(
-        project_id: str,
-        user_id: str,
-        db: Session = Depends(get_db),
-        current_user: str = Depends(get_current_user),
+    project_id: str,
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
 ):
     try:
         return services.add_user_to_project(db, user_id, project_id, current_user)

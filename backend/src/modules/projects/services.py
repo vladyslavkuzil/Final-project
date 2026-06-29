@@ -31,7 +31,7 @@ def get_project_by_id(db: Session, project_id: str) -> Project | None:
 
 
 def get_project_by_id_admin(
-        db: Session, project_id: str, user_id: str
+    db: Session, project_id: str, user_id: str
 ) -> Project | None:
     """Return a single Project object by its primary key(uuid) available as admin, None if no project is found.
 
@@ -86,7 +86,7 @@ def get_project_by_name_admin(db: Session, name: str, user_id: str) -> Project |
 
 
 def _create_project(
-        db: Session, name: str, description: str | None = None, admin_id: str | None = None
+    db: Session, name: str, description: str | None = None, admin_id: str | None = None
 ) -> Project:
     """Create a new project and return it refreshed from the database.
 
@@ -121,8 +121,9 @@ def _create_project(
     return project
 
 
-def create_project(db: Session, name: str, user_id: str, description: str | None = None
-                   ) -> Project:
+def create_project(
+    db: Session, name: str, user_id: str, description: str | None = None
+) -> Project:
     """Create a new project, assign the creator as OWNER, and return it.
 
     Args:
@@ -141,7 +142,9 @@ def create_project(db: Session, name: str, user_id: str, description: str | None
     """
     try:
         project = _create_project(db, name, description, admin_id=user_id)
-        project_membership = ProjectMembership(project_id=project.id, user_id=user_id, role=MembershipRole.OWNER)
+        project_membership = ProjectMembership(
+            project_id=project.id, user_id=user_id, role=MembershipRole.OWNER
+        )
 
         user = db.query(User).filter(User.id == user_id).one_or_none()
         if user is None:
@@ -176,12 +179,12 @@ def get_all_projects(db: Session, user_id: str) -> list[Project]:
 
 
 def update_project(
-        db: Session,
-        project_id: str,
-        user_id: str,
-        name: str | None = None,
-        description: str | None = None,
-        is_finished: bool | None = None,
+    db: Session,
+    project_id: str,
+    user_id: str,
+    name: str | None = None,
+    description: str | None = None,
+    is_finished: bool | None = None,
 ) -> Project:
     """Update mutable Project object fields.
 

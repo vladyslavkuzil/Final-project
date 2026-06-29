@@ -2,6 +2,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field, EmailStr
 from src.modules.project_membership.models import MembershipRole
 
+
 class ProjectCreate(BaseModel):
     name: str = Field(max_length=255)
     description: str | None = None
