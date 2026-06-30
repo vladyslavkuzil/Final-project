@@ -22,7 +22,12 @@ class ProjectMembership(Base):
     )
 
     role: Mapped[MembershipRole] = mapped_column(
-        Enum(MembershipRole, values_callable=lambda x: [e.value for e in x]),
+        Enum(
+            MembershipRole,
+            native_enum=False,
+            name="membershiprole",
+            values_callable=lambda x: [e.value for e in x],
+        ),
         nullable=False,
     )
     created_at: Mapped[datetime] = mapped_column(

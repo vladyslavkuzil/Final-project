@@ -2,8 +2,9 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from src.core.enums import MembershipRole
 from src.modules.auth.models import User
-from src.modules.project_membership.models import ProjectMembership, MembershipRole
+from src.modules.project_membership.models import ProjectMembership
 from src.modules.projects.models import Project
 
 NONEXISTENT_PROJECT_ID = "does-not-exist-project"

@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import Mock, patch
 
-from src.modules.project_membership.models import MembershipRole
+from src.core.enums import MembershipRole
 from src.modules.projects import services
 from src.modules.projects.exceptions import (
     ProjectAlreadyExistsError,
