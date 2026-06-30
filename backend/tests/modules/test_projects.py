@@ -7,6 +7,7 @@ from src.modules.projects.exceptions import (
     ProjectAlreadyExistsError,
     ProjectNotFoundError,
     UserNotFoundError,
+    OwnerCannotLeaveError,
 )
 
 
@@ -227,6 +228,35 @@ class ProjectServiceUnitTests(unittest.TestCase):
 
         self.db.commit.assert_called_once()
         self.assertIn(user, updated.users)
+
+    def test_leave_project_raises_when_project_missing(self):
+        self.db.query.return_value = make_query(None)
+        with self.assertRaises(ProjectNotFoundError):
+            services.leave_project(self.db, "missing-id", "user-2")
+
+    def test_leave_project_raises_when_owner_leaves(self):
+        project = SimpleProject(admin_id="owner-id")
+        self.db.query.return_value = make_query(project)
+        with self.assertRaises(OwnerCannotLeaveError):
+            services.leave_project(self.db, project.id, "owner-id")
+
+    def test_leave_project_removes_membership_and_user(self):
+        project = SimpleProject(admin_id="owner-id")
+        membership = Mock()
+        user = make_user(user_id="user-2")
+        project.users = [user]
+        # Project lookup, then membership lookup, then user lookup.
+        self.db.query.side_effect = [
+            make_query(project),
+            make_query(membership),
+            make_query(user),
+        ]
+
+        services.leave_project(self.db, project.id, "user-2")
+
+        self.assertNotIn(user, project.users)
+        self.db.delete.assert_called_once_with(membership)
+        self.db.commit.assert_called_once()
 
 
 if __name__ == "__main__":
