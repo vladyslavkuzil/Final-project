@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import Mock, patch
 
+from src.core.enums import MembershipRole
 from src.modules.projects import services
 from src.modules.projects.exceptions import (
     ProjectAlreadyExistsError,
@@ -23,6 +24,7 @@ class SimpleProject:
         self.admin_id = admin_id
         self.is_finished = False
         self.users = []
+        self.user_role: MembershipRole | None = None
 
 
 def make_user(user_id="admin-id", email="admin@test.com"):
@@ -56,7 +58,7 @@ class ProjectServiceUnitTests(unittest.TestCase):
         expected = SimpleProject()
         self.db.query.return_value = make_query(expected)
 
-        project = services.get_project_by_id(self.db, expected.id, "admin-id")
+        project = services.get_project_by_id(self.db, expected.id)
 
         self.assertIs(project, expected)
         self.db.query.assert_called_once()
@@ -79,6 +81,8 @@ class ProjectServiceUnitTests(unittest.TestCase):
         self.assertEqual(result, expected)
 
     def test_create_project_raises_when_name_already_exists(self):
+        user = make_user()
+        self.db.query.return_value = make_query(user)
         with patch.object(services, "get_project_by_name", return_value=Mock()):
             with self.assertRaises(ProjectAlreadyExistsError):
                 services.create_project(self.db, "project-1", "admin-id")
@@ -103,6 +107,7 @@ class ProjectServiceUnitTests(unittest.TestCase):
         self.assertEqual(project.name, "project-1")
         self.assertEqual(project.description, "a project")
         self.assertEqual(project.admin_id, "admin-id")
+        self.assertEqual(project.user_role, MembershipRole.OWNER)
         self.db.commit.assert_called_once()
         self.db.refresh.assert_called_once_with(project)
         self.assertIn(user, project.users)

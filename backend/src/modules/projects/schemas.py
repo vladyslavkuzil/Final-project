@@ -1,5 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel, Field, EmailStr
+from src.core.enums import MembershipRole
 
 
 class ProjectCreate(BaseModel):
@@ -31,5 +32,5 @@ class ProjectResponse(BaseModel):
     is_finished: bool
     admin: UserResponse
     users: list[UserResponse]
-
+    user_role: MembershipRole | None = None
     model_config = {"from_attributes": True}

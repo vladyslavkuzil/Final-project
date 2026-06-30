@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-
 from src.core.database import get_db
 from src.core.security import get_current_user
-
+from src.core.dependencies import require_role
+from src.core.enums import MembershipRole
 from src.modules.projects import services, schemas
 from src.modules.projects.exceptions import (
     ProjectAlreadyExistsError,
@@ -29,7 +29,7 @@ def create_project(
             db=db,
             name=payload.name,
             description=payload.description,
-            admin_id=current_user,
+            user_id=current_user,
         )
     except ProjectAlreadyExistsError as exc:
         raise HTTPException(
@@ -61,14 +61,15 @@ def list_projects(
 def retrieve_project_id(
     project_id: str,
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    user_role: MembershipRole = Depends(require_role()),
 ):
-    project = services.get_project_by_id(db, project_id, current_user)
+    project = services.get_project_by_id(db, project_id)
 
     if project is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Project not found."
         )
+    project.user_role = user_role
 
     return project
 
@@ -150,6 +151,7 @@ def invite_user(
     user_id: str,
     db: Session = Depends(get_db),
     current_user: str = Depends(get_current_user),
+    _: MembershipRole = Depends(require_role(MembershipRole.OWNER)),
 ):
     try:
         return services.add_user_to_project(db, user_id, project_id, current_user)
