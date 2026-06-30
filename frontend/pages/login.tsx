@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
-import { FOCUS_RING, Hov, INPUT_STYLE, LABEL_STYLE, Logo } from "../components/infoboard/ui";
+import { ERROR_STYLE, FOCUS_RING, Hov, INPUT_STYLE, LABEL_STYLE, Logo } from "../components/infoboard/ui";
 import { login } from "../lib/api";
 
 export default function Login() {
@@ -62,9 +62,7 @@ export default function Login() {
               style={{ ...INPUT_STYLE, marginBottom: error ? 12 : 22 }}
               focusStyle={FOCUS_RING}
             />
-            {error && (
-              <p style={{ margin: "0 0 16px", fontSize: 13, color: "#c0392b" }}>{error}</p>
-            )}
+            {error && <p style={ERROR_STYLE}>{error}</p>}
             <Hov
               as="button"
               onClick={submit}

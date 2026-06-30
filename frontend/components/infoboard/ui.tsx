@@ -79,6 +79,12 @@ export const LABEL_STYLE: React.CSSProperties = {
   marginBottom: 6,
 };
 
+export const ERROR_STYLE: React.CSSProperties = {
+  margin: "0 0 16px",
+  fontSize: 13,
+  color: "#c0392b",
+};
+
 export function Logo({ size = "lg" }: { size?: "lg" | "sm" }) {
   const lg = size === "lg";
   return (

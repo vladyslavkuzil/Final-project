@@ -10,9 +10,9 @@ from src.core.enums import MembershipRole
 from src.core.storage import StorageBackend, get_storage
 from src.modules.documents import services
 from src.modules.documents.schemas import (
-    ALLOWED_EXTENSIONS,
     DocumentUpdate,
     DocumentResponse,
+    validate_file_path,
 )
 
 router = APIRouter()
@@ -49,13 +49,10 @@ async def upload_document(
     access: AccessContext = Depends(require_role()),
     storage: StorageBackend = Depends(get_storage),
 ):
-    ext = Path(file.filename or "").suffix.lower()
-    if ext not in ALLOWED_EXTENSIONS:
-        allowed = ", ".join(sorted(ALLOWED_EXTENSIONS))
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File extension '{ext}' is not allowed. Accepted: {allowed}",
-        )
+    try:
+        validate_file_path(file.filename or "")
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     stored_path = await storage.save(file)
     return services.create_document(db, project_id, title, stored_path, access.user_id)
 
@@ -111,10 +108,7 @@ def delete_document(
     _: AccessContext = Depends(require_role(MembershipRole.OWNER)),
     storage: StorageBackend = Depends(get_storage),
 ):
-    doc = services.get_document(db, document_id, project_id)
-    if not doc:
+    if not services.delete_document(db, storage, document_id, project_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
         )
-    storage.delete(doc.file_path)
-    services.delete_document(db, document_id, project_id)

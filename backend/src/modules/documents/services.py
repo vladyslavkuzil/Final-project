@@ -6,6 +6,7 @@ Handles all CRUD operations for project documents.
 
 import uuid
 from sqlalchemy.orm import Session
+from src.core.storage import StorageBackend
 from src.modules.documents.models import Document
 
 
@@ -91,11 +92,14 @@ def update_document(
     return doc
 
 
-def delete_document(db: Session, document_id: str, project_id: str) -> bool:
+def delete_document(
+    db: Session, storage: StorageBackend, document_id: str, project_id: str
+) -> bool:
     # project_id scope prevents cross-project deletions.
     doc = get_document(db, document_id, project_id)
     if not doc:
         return False
+    storage.delete(doc.file_path)
     try:
         db.delete(doc)
         db.commit()

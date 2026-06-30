@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import type { Project } from "../../lib/store";
-import { FOCUS_RING, Hov, INPUT_STYLE, LABEL_STYLE, Modal } from "./ui";
+import { ERROR_STYLE, FOCUS_RING, Hov, INPUT_STYLE, LABEL_STYLE, Modal } from "./ui";
 
 const CANCEL_STYLE: React.CSSProperties = {
   fontSize: 13,
@@ -30,11 +30,31 @@ const FOOTER_STYLE: React.CSSProperties = {
   gap: 10,
 };
 
-const ERROR_STYLE: React.CSSProperties = {
-  margin: "0 0 16px",
-  fontSize: 13,
-  color: "#c0392b",
-};
+// Shared submit lifecycle for the modals: tracks busy/error, runs the action,
+// closes on success, and surfaces the error message on failure.
+function useModalSubmit(
+  action: () => Promise<void> | void,
+  onClose: () => void,
+  fallback: string
+) {
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await action();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : fallback);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return { error, busy, submit };
+}
 
 export function NewProjectModal({
   onClose,
@@ -45,22 +65,15 @@ export function NewProjectModal({
 }) {
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const { error, busy, submit } = useModalSubmit(
+    () => onCreate(name.trim(), desc.trim()),
+    onClose,
+    "Failed to create project"
+  );
 
-  const create = async () => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    setBusy(true);
-    setError("");
-    try {
-      await onCreate(trimmed, desc.trim());
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to create project");
-    } finally {
-      setBusy(false);
-    }
+  const create = () => {
+    if (!name.trim()) return;
+    submit();
   };
 
   return (
@@ -110,22 +123,15 @@ export function InviteModal({
   onSend: (email: string) => void | Promise<void>;
 }) {
   const [email, setEmail] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const { error, busy, submit } = useModalSubmit(
+    () => onSend(email.trim()),
+    onClose,
+    "Failed to send invite"
+  );
 
-  const send = async () => {
-    const value = email.trim();
-    if (!value) return;
-    setBusy(true);
-    setError("");
-    try {
-      await onSend(value);
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to send invite");
-    } finally {
-      setBusy(false);
-    }
+  const send = () => {
+    if (!email.trim()) return;
+    submit();
   };
 
   return (
@@ -169,21 +175,11 @@ export function SettingsModal({
   const [name, setName] = useState(project.name);
   const [desc, setDesc] = useState(project.desc);
   const [finished, setFinished] = useState(project.finished);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const save = async () => {
-    setBusy(true);
-    setError("");
-    try {
-      await onSave({ name, desc, finished });
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to save settings");
-    } finally {
-      setBusy(false);
-    }
-  };
+  const { error, busy, submit } = useModalSubmit(
+    () => onSave({ name, desc, finished }),
+    onClose,
+    "Failed to save settings"
+  );
 
   return (
     <Modal maxWidth={440} onClose={onClose}>
@@ -258,7 +254,7 @@ export function SettingsModal({
         </Hov>
         <Hov
           as="button"
-          onClick={save}
+          onClick={submit}
           disabled={busy}
           style={CONFIRM_STYLE}
           hoverStyle={{ background: "#2560d8" }}
