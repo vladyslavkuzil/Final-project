@@ -49,6 +49,13 @@ pip-delete-this-directory.txt
 # FastAPI / Uvicorn
 *.log
 
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+terraform.exe
+
 # Frontend / Node
 frontend/node_modules/
 node_modules/
