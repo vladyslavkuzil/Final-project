@@ -37,3 +37,15 @@ output "db_subnet_group_name" {
   description = "Name of the RDS DB subnet group"
   value       = module.vpc.db_subnet_group_name
 }
+
+output "db_endpoint" {
+  value = module.database.db_endpoint
+}
+
+output "db_port" {
+  value = module.database.db_port
+}
+
+output "db_name" {
+  value = module.database.db_name
+}
