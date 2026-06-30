@@ -65,51 +65,43 @@ export default function ProjectDashboard() {
   const isAdmin = project.myRole === "Admin";
   const projInitial = initialOf(project.name.replace(/^Project\s+/i, ""));
 
+  // Run an async action, surfacing any failure as an alert. Returns whether it
+  // succeeded so callers can navigate only on success.
+  const runOrAlert = async (fn: () => Promise<void>, fallback: string): Promise<boolean> => {
+    try {
+      await fn();
+      return true;
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : fallback);
+      return false;
+    }
+  };
+
   const onDeleteProject = async () => {
     if (!window.confirm('Delete "' + project.name + '"? This cannot be undone.')) return;
-    try {
-      await deleteProject(project.id);
+    if (await runOrAlert(() => deleteProject(project.id), "Failed to delete project")) {
       router.push("/projects");
-    } catch (e) {
-      window.alert(e instanceof Error ? e.message : "Failed to delete project");
     }
   };
 
   const onLeaveProject = async () => {
     if (!window.confirm('Leave "' + project.name + '"? You will lose access to its files.')) return;
-    try {
-      await leaveProject(project.id);
+    if (await runOrAlert(() => leaveProject(project.id), "Failed to leave project")) {
       router.push("/projects");
-    } catch (e) {
-      window.alert(e instanceof Error ? e.message : "Failed to leave project");
     }
   };
 
   const onRename = async (f: FileItem) => {
     const next = window.prompt("Rename document", f.name);
     if (!next || next === f.name) return;
-    try {
-      await renameFile(project.id, f.id, next);
-    } catch (e) {
-      window.alert(e instanceof Error ? e.message : "Failed to rename document");
-    }
+    await runOrAlert(() => renameFile(project.id, f.id, next), "Failed to rename document");
   };
 
-  const onDelete = async (f: FileItem) => {
-    try {
-      await deleteFile(project.id, f.id);
-    } catch (e) {
-      window.alert(e instanceof Error ? e.message : "Failed to delete document");
-    }
-  };
+  const onDelete = (f: FileItem) =>
+    runOrAlert(() => deleteFile(project.id, f.id), "Failed to delete document");
 
-  const onDownload = async (f: FileItem) => {
-    try {
-      await downloadFile(project.id, f.id, f.name);
-    } catch (e) {
-      window.alert(e instanceof Error ? e.message : "Failed to download document");
-    }
-  };
+  const onDownload = (f: FileItem) =>
+    runOrAlert(() => downloadFile(project.id, f.id, f.name), "Failed to download document");
 
   const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -117,11 +109,10 @@ export default function ProjectDashboard() {
     if (!file) return;
     const title = window.prompt("Document title", file.name);
     if (title === null) return;
-    try {
-      await uploadFile(project.id, file, title.trim() || file.name);
-    } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Failed to upload document");
-    }
+    await runOrAlert(
+      () => uploadFile(project.id, file, title.trim() || file.name),
+      "Failed to upload document"
+    );
   };
 
   const iconBtn: React.CSSProperties = {
@@ -299,37 +290,33 @@ export default function ProjectDashboard() {
             <main style={{ padding: "30px 36px 90px", maxWidth: 980, width: "100%" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22 }}>
                 <h1 style={{ margin: 0, fontSize: 21, fontWeight: 600, letterSpacing: "-.4px" }}>Files</h1>
-                {isAdmin && (
-                  <>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".pdf,.docx,.xlsx,.txt"
-                      onChange={onPickFile}
-                      style={{ display: "none" }}
-                    />
-                    <Hov
-                      as="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 500,
-                        color: "#fff",
-                        background: "#2f6fed",
-                        border: "none",
-                        borderRadius: 8,
-                        padding: "8px 14px",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                      }}
-                      hoverStyle={{ background: "#2560d8" }}
-                    >
-                      <span style={{ fontSize: 14, marginTop: -1 }}>↑</span>Upload Document
-                    </Hov>
-                  </>
-                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.docx,.xlsx,.txt"
+                  onChange={onPickFile}
+                  style={{ display: "none" }}
+                />
+                <Hov
+                  as="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: "#fff",
+                    background: "#2f6fed",
+                    border: "none",
+                    borderRadius: 8,
+                    padding: "8px 14px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                  hoverStyle={{ background: "#2560d8" }}
+                >
+                  <span style={{ fontSize: 14, marginTop: -1 }}>↑</span>Upload Document
+                </Hov>
               </div>
 
               {project.files.length > 0 ? (
@@ -413,27 +400,25 @@ export default function ProjectDashboard() {
                         >
                           ↓
                         </Hov>
+                        <Hov
+                          as="button"
+                          title="Rename"
+                          onClick={() => onRename(f)}
+                          style={{ ...iconBtn, color: "#6b6b67", fontSize: 12 }}
+                          hoverStyle={{ background: "#f4f4f2", color: "#37352f" }}
+                        >
+                          ✎
+                        </Hov>
                         {isAdmin && (
-                          <>
-                            <Hov
-                              as="button"
-                              title="Rename"
-                              onClick={() => onRename(f)}
-                              style={{ ...iconBtn, color: "#6b6b67", fontSize: 12 }}
-                              hoverStyle={{ background: "#f4f4f2", color: "#37352f" }}
-                            >
-                              ✎
-                            </Hov>
-                            <Hov
-                              as="button"
-                              title="Delete"
-                              onClick={() => onDelete(f)}
-                              style={{ ...iconBtn, color: "#c0392b", fontSize: 12 }}
-                              hoverStyle={{ background: "#fdf2f1", borderColor: "#e8b9b3" }}
-                            >
-                              🗑
-                            </Hov>
-                          </>
+                          <Hov
+                            as="button"
+                            title="Delete"
+                            onClick={() => onDelete(f)}
+                            style={{ ...iconBtn, color: "#c0392b", fontSize: 12 }}
+                            hoverStyle={{ background: "#fdf2f1", borderColor: "#e8b9b3" }}
+                          >
+                            🗑
+                          </Hov>
                         )}
                       </div>
                     </Hov>
