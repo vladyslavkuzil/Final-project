@@ -81,6 +81,8 @@ class ProjectServiceUnitTests(unittest.TestCase):
         self.assertEqual(result, expected)
 
     def test_create_project_raises_when_name_already_exists(self):
+        user = make_user()
+        self.db.query.return_value = make_query(user)
         with patch.object(services, "get_project_by_name", return_value=Mock()):
             with self.assertRaises(ProjectAlreadyExistsError):
                 services.create_project(self.db, "project-1", "admin-id")
