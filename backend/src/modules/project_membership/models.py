@@ -21,7 +21,10 @@ class ProjectMembership(Base):
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
 
-    role: Mapped[MembershipRole] = mapped_column(Enum(MembershipRole), nullable=False)
+    role: Mapped[MembershipRole] = mapped_column(
+        Enum(MembershipRole, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
