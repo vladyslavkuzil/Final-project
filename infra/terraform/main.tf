@@ -12,7 +12,7 @@ module "vpc" {
 
 # Call the DATABASE module 
 module "database" {
-  source = "./database"
+  source = "./modules/database"
 
   project_name = var.project_name
   db_subnet_group_name  = module.vpc.db_subnet_group_name
