@@ -5,9 +5,8 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from src.core.database import get_db
-from src.core.dependencies import require_role
+from src.core.dependencies import AccessContext, require_role
 from src.core.enums import MembershipRole
-from src.core.security import get_current_user
 from src.modules.documents import services
 from src.modules.documents.schemas import (
     DocumentCreate,
@@ -27,7 +26,7 @@ def _safe_filename(file_path: str) -> str:
 def list_documents(
     project_id: str,
     db: Session = Depends(get_db),
-    _: MembershipRole = Depends(require_role()),
+    _: AccessContext = Depends(require_role()),
 ):
     return services.get_documents_by_project(db, project_id)
 
@@ -37,11 +36,10 @@ def upload_document(
     project_id: str,
     payload: DocumentCreate,
     db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user),
-    _: MembershipRole = Depends(require_role()),
+    access: AccessContext = Depends(require_role()),
 ):
     return services.create_document(
-        db, project_id, payload.title, payload.file_path, user_id
+        db, project_id, payload.title, payload.file_path, access.user_id
     )
 
 
@@ -50,7 +48,7 @@ def download_document(
     project_id: str,
     document_id: str,
     db: Session = Depends(get_db),
-    _: MembershipRole = Depends(require_role()),
+    _: AccessContext = Depends(require_role()),
 ):
     doc = services.get_document(db, document_id, project_id)
     if not doc:
@@ -76,7 +74,7 @@ def update_document(
     document_id: str,
     payload: DocumentUpdate,
     db: Session = Depends(get_db),
-    _: MembershipRole = Depends(require_role()),
+    _: AccessContext = Depends(require_role()),
 ):
     doc = services.update_document(
         db, document_id, project_id, payload.title, payload.file_path
@@ -93,7 +91,7 @@ def delete_document(
     project_id: str,
     document_id: str,
     db: Session = Depends(get_db),
-    _: MembershipRole = Depends(require_role(MembershipRole.OWNER)),
+    _: AccessContext = Depends(require_role(MembershipRole.OWNER)),
 ):
     if not services.delete_document(db, document_id, project_id):
         raise HTTPException(

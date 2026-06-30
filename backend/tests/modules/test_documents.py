@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -9,6 +10,13 @@ from src.modules.projects.models import Project
 
 NONEXISTENT_PROJECT_ID = "does-not-exist-project"
 NONEXISTENT_DOCUMENT_ID = "does-not-exist-xyz"
+
+
+@pytest.fixture(autouse=True)
+def mock_redis():
+    with patch("src.modules.projects.services.redis_client") as mock:
+        mock.get.return_value = None
+        yield mock
 
 
 @pytest.fixture
@@ -76,14 +84,21 @@ def created_doc(client: TestClient, db: Session, seeded_project: Project) -> dic
     return r.json()
 
 
-@pytest.fixture(autouse=True)
-def override_auth():
+@pytest.fixture
+def auth_as():
     from src.main import app
     from src.core.security import get_current_user
 
-    app.dependency_overrides[get_current_user] = lambda: "user-999"
-    yield
+    def _set(user_id: str):
+        app.dependency_overrides[get_current_user] = lambda: user_id
+
+    yield _set
     app.dependency_overrides.pop(get_current_user, None)
+
+
+@pytest.fixture(autouse=True)
+def override_auth(auth_as):
+    auth_as("user-999")
 
 
 # ---------------------------------------------------------------------------
@@ -342,6 +357,21 @@ def test_delete_document_without_token_returns_401(
     assert response.status_code == 401
 
 
+def test_upload_document_without_token_returns_401(
+    client: TestClient, no_auth, seeded_project: Project
+):
+    # Arrange — auth override removed via no_auth fixture
+
+    # Act
+    response = client.post(
+        f"/project/{seeded_project.id}/documents",
+        json={"title": "Doc", "file_path": "/f/file.pdf"},
+    )
+
+    # Assert
+    assert response.status_code == 401
+
+
 # ---------------------------------------------------------------------------
 # 404 — nonexistent project_id must be rejected on project-scoped endpoints
 # ---------------------------------------------------------------------------
@@ -371,19 +401,47 @@ def test_upload_document_nonexistent_project_returns_404(client: TestClient):
     assert response.status_code == 404
 
 
+def test_download_document_nonexistent_project_returns_404(client: TestClient):
+    # Arrange — new path added by require_role() on this endpoint
+
+    # Act
+    response = client.get(
+        f"/project/{NONEXISTENT_PROJECT_ID}/documents/{NONEXISTENT_DOCUMENT_ID}"
+    )
+
+    # Assert
+    assert response.status_code == 404
+
+
+def test_update_document_nonexistent_project_returns_404(client: TestClient):
+    # Act
+    response = client.put(
+        f"/project/{NONEXISTENT_PROJECT_ID}/documents/{NONEXISTENT_DOCUMENT_ID}",
+        json={"title": "x"},
+    )
+
+    # Assert
+    assert response.status_code == 404
+
+
+def test_delete_document_nonexistent_project_returns_404(client: TestClient):
+    # Act
+    response = client.delete(
+        f"/project/{NONEXISTENT_PROJECT_ID}/documents/{NONEXISTENT_DOCUMENT_ID}"
+    )
+
+    # Assert
+    assert response.status_code == 404
+
+
 # ---------------------------------------------------------------------------
 # Role-based access — 403 for users with no project membership
 # ---------------------------------------------------------------------------
 
 
 @pytest.fixture
-def as_no_access(no_access_user: User):
-    from src.main import app
-    from src.core.security import get_current_user
-
-    app.dependency_overrides[get_current_user] = lambda: no_access_user.id
-    yield
-    app.dependency_overrides.pop(get_current_user, None)
+def as_no_access(auth_as, no_access_user: User):
+    auth_as(no_access_user.id)
 
 
 def test_no_access_user_cannot_list_documents(
@@ -462,13 +520,8 @@ def test_no_access_user_cannot_delete_document(
 
 
 @pytest.fixture
-def as_participant(participant_user: User):
-    from src.main import app
-    from src.core.security import get_current_user
-
-    app.dependency_overrides[get_current_user] = lambda: participant_user.id
-    yield
-    app.dependency_overrides.pop(get_current_user, None)
+def as_participant(auth_as, participant_user: User):
+    auth_as(participant_user.id)
 
 
 def test_participant_can_list_documents(
