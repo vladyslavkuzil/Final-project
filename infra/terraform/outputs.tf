@@ -1,0 +1,39 @@
+output "vpc_id" {
+  description = "ID of the VPC"
+  value       = module.vpc.vpc_id
+}
+
+output "public_subnet_ids" {
+  description = "IDs of the public subnets"
+  value       = module.vpc.public_subnet_ids
+}
+
+output "private_subnet_ids" {
+  description = "IDs of the private (ECS) subnets"
+  value       = module.vpc.private_subnet_ids
+}
+
+output "db_subnet_ids" {
+  description = "IDs of the database subnets"
+  value       = module.vpc.db_subnet_ids
+}
+
+output "alb_sg_id" {
+  description = "Security group ID for the ALB"
+  value       = aws_security_group.alb.id
+}
+
+output "ecs_sg_id" {
+  description = "Security group ID for ECS"
+  value       = aws_security_group.ecs.id
+}
+
+output "rds_sg_id" {
+  description = "Security group ID for RDS"
+  value       = aws_security_group.rds.id
+}
+
+output "db_subnet_group_name" {
+  description = "Name of the RDS DB subnet group"
+  value       = module.vpc.db_subnet_group_name
+}
