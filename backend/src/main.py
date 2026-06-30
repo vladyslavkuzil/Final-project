@@ -10,7 +10,7 @@ from src.modules.auth.router import router as auth_router
 from src.modules.projects.router import router as projects_router
 
 app = FastAPI(title="Project Dashboard API")
-app.include_router(documents_router)
+app.include_router(documents_router, prefix="/project/{project_id}/documents")
 app.include_router(auth_router)
 app.include_router(projects_router)
 
