@@ -18,15 +18,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.create_foreign_key(
-        "fk_documents_project_id",
-        "documents",
-        "projects",
-        ["project_id"],
-        ["id"],
-        ondelete="CASCADE",
-    )
+    # fk_documents_project_id was already created in a71286368b57; no-op here.
+    pass
 
 
 def downgrade() -> None:
-    op.drop_constraint("fk_documents_project_id", "documents", type_="foreignkey")
+    # Nothing was created in upgrade, so nothing to drop.
+    pass
