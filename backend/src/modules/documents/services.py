@@ -22,17 +22,25 @@ def get_documents_by_project(db: Session, project_id: str) -> list[Document]:
     return db.query(Document).filter(Document.project_id == project_id).all()
 
 
-def get_document(db: Session, document_id: str) -> Document | None:
-    """Fetch a single document by its primary key.
+def get_document(db: Session, document_id: str, project_id: str) -> Document | None:
+    """Fetch a single document by its primary key, scoped to a project.
+
+    Filtering by both document_id and project_id ensures a document from
+    a different project cannot be accessed via an unrelated project's URL.
 
     Args:
         db: Active SQLAlchemy session.
         document_id: UUID string of the document to retrieve.
+        project_id: UUID string of the project the document must belong to.
 
     Returns:
-        The matching Document, or None if no row is found.
+        The matching Document, or None if not found within this project.
     """
-    return db.query(Document).filter(Document.id == document_id).first()
+    return (
+        db.query(Document)
+        .filter(Document.id == document_id, Document.project_id == project_id)
+        .first()
+    )
 
 
 def create_document(
@@ -74,29 +82,32 @@ def create_document(
 def update_document(
     db: Session,
     document_id: str,
+    project_id: str,
     title: str | None,
     file_path: str | None,
 ) -> Document | None:
     """Update mutable metadata fields on an existing document.
 
     Only fields supplied with a non-None value are modified; omitted fields
-    retain their current values.
+    retain their current values. project_id is required to scope the lookup
+    and prevent cross-project modifications.
 
     Args:
         db: Active SQLAlchemy session.
         document_id: UUID string of the document to update.
+        project_id: UUID string of the project the document must belong to.
         title: New title, or None to leave unchanged.
         file_path: New file path, or None to leave unchanged.
 
     Returns:
         The updated Document refreshed from the database, or None if the
-        document does not exist.
+        document does not exist within this project.
 
     Raises:
         Exception: Re-raises any database error after rolling back the
             transaction to leave the session in a clean state.
     """
-    doc = get_document(db, document_id)
+    doc = get_document(db, document_id, project_id)
     if not doc:
         return None
     if title is not None:
@@ -112,21 +123,26 @@ def update_document(
     return doc
 
 
-def delete_document(db: Session, document_id: str) -> bool:
-    """Remove a document row from the database.
+def delete_document(db: Session, document_id: str, project_id: str) -> bool:
+    """Remove a document row from the database, scoped to a project.
+
+    project_id is required to scope the lookup and prevent cross-project
+    deletions.
 
     Args:
         db: Active SQLAlchemy session.
         document_id: UUID string of the document to delete.
+        project_id: UUID string of the project the document must belong to.
 
     Returns:
-        True if the document was found and deleted, False if it did not exist.
+        True if the document was found and deleted, False if it did not exist
+        within this project.
 
     Raises:
         Exception: Re-raises any database error after rolling back the
             transaction to leave the session in a clean state.
     """
-    doc = get_document(db, document_id)
+    doc = get_document(db, document_id, project_id)
     if not doc:
         return False
     try:

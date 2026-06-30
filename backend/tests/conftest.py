@@ -1,9 +1,17 @@
 import pytest
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from src.core.database import engine, get_db
 from src.main import app
+
+
+@pytest.fixture(autouse=True)
+def mock_redis():
+    with patch("src.modules.projects.services.redis_client") as mock:
+        mock.get.return_value = None
+        yield mock
 
 
 @pytest.fixture(scope="module")

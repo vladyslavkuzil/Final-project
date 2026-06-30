@@ -5,7 +5,8 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from src.core.database import get_db
-from src.core.dependencies import get_project_or_404
+from src.core.dependencies import require_role
+from src.core.enums import MembershipRole
 from src.core.security import get_current_user
 from src.modules.documents import services
 from src.modules.documents.schemas import (
@@ -22,37 +23,36 @@ def _safe_filename(file_path: str) -> str:
     return Path(file_path).name.replace('"', "").replace("\r", "").replace("\n", "")
 
 
-@router.get("/project/{project_id}/documents", response_model=list[DocumentResponse])
+@router.get("", response_model=list[DocumentResponse])
 def list_documents(
+    project_id: str,
     db: Session = Depends(get_db),
-    project_id: str = Depends(get_project_or_404),
+    _: MembershipRole = Depends(require_role()),
 ):
     return services.get_documents_by_project(db, project_id)
 
 
-@router.post(
-    "/project/{project_id}/documents",
-    response_model=DocumentResponse,
-    status_code=status.HTTP_201_CREATED,
-)
+@router.post("", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
 def upload_document(
+    project_id: str,
     payload: DocumentCreate,
-    user_id: str = Depends(get_current_user),
     db: Session = Depends(get_db),
-    project_id: str = Depends(get_project_or_404),
+    user_id: str = Depends(get_current_user),
+    _: MembershipRole = Depends(require_role()),
 ):
     return services.create_document(
         db, project_id, payload.title, payload.file_path, user_id
     )
 
 
-@router.get("/document/{document_id}")
+@router.get("/{document_id}")
 def download_document(
+    project_id: str,
     document_id: str,
     db: Session = Depends(get_db),
-    _: str = Depends(get_current_user),
+    _: MembershipRole = Depends(require_role()),
 ):
-    doc = services.get_document(db, document_id)
+    doc = services.get_document(db, document_id, project_id)
     if not doc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
@@ -70,14 +70,17 @@ def download_document(
     )
 
 
-@router.put("/document/{document_id}", response_model=DocumentResponse)
+@router.put("/{document_id}", response_model=DocumentResponse)
 def update_document(
+    project_id: str,
     document_id: str,
     payload: DocumentUpdate,
     db: Session = Depends(get_db),
-    _: str = Depends(get_current_user),
+    _: MembershipRole = Depends(require_role()),
 ):
-    doc = services.update_document(db, document_id, payload.title, payload.file_path)
+    doc = services.update_document(
+        db, document_id, project_id, payload.title, payload.file_path
+    )
     if not doc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
@@ -85,13 +88,14 @@ def update_document(
     return doc
 
 
-@router.delete("/document/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_document(
+    project_id: str,
     document_id: str,
     db: Session = Depends(get_db),
-    _: str = Depends(get_current_user),
+    _: MembershipRole = Depends(require_role(MembershipRole.OWNER)),
 ):
-    if not services.delete_document(db, document_id):
+    if not services.delete_document(db, document_id, project_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
         )

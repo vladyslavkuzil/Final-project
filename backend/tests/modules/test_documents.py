@@ -8,6 +8,7 @@ from src.modules.project_membership.models import ProjectMembership
 from src.modules.projects.models import Project
 
 NONEXISTENT_PROJECT_ID = "does-not-exist-project"
+NONEXISTENT_DOCUMENT_ID = "does-not-exist-xyz"
 
 
 @pytest.fixture
@@ -30,6 +31,39 @@ def seeded_project(db: Session) -> Project:
     db.add(membership)
     db.flush()
     return project
+
+
+@pytest.fixture
+def participant_user(db: Session, seeded_project: Project) -> User:
+    user = User(
+        id="user-participant",
+        email="participant@example.com",
+        hashed_password="x",
+        is_active=True,
+    )
+    db.add(user)
+    db.flush()
+    membership = ProjectMembership(
+        project_id=seeded_project.id,
+        user_id="user-participant",
+        role=MembershipRole.PARTICIPANT,
+    )
+    db.add(membership)
+    db.flush()
+    return user
+
+
+@pytest.fixture
+def no_access_user(db: Session) -> User:
+    user = User(
+        id="user-noaccess",
+        email="noaccess@example.com",
+        hashed_password="x",
+        is_active=True,
+    )
+    db.add(user)
+    db.flush()
+    return user
 
 
 @pytest.fixture
@@ -107,17 +141,17 @@ def test_create_document_disallowed_extension_returns_422(
 
 
 # ---------------------------------------------------------------------------
-# GET /document/{document_id}
+# GET /project/{project_id}/documents/{document_id}
 # ---------------------------------------------------------------------------
 
 
 def test_download_document_existing_id_returns_200(
-    client: TestClient, created_doc: dict
+    client: TestClient, created_doc: dict, seeded_project: Project
 ):
     # Arrange — document seeded via fixture
 
     # Act
-    response = client.get(f"/document/{created_doc['id']}")
+    response = client.get(f"/project/{seeded_project.id}/documents/{created_doc['id']}")
 
     # Assert
     assert response.status_code == 200
@@ -135,7 +169,7 @@ def test_download_document_content_disposition_exposes_only_basename(
     doc_id = r.json()["id"]
 
     # Act
-    response = client.get(f"/document/{doc_id}")
+    response = client.get(f"/project/{seeded_project.id}/documents/{doc_id}")
 
     # Assert — header must contain only the filename, not the full path
     disposition = response.headers["content-disposition"]
@@ -143,28 +177,34 @@ def test_download_document_content_disposition_exposes_only_basename(
     assert "/internal/secrets/" not in disposition
 
 
-def test_download_document_nonexistent_id_returns_404(client: TestClient):
+def test_download_document_nonexistent_id_returns_404(
+    client: TestClient, seeded_project: Project
+):
     # Arrange
-    doc_id = "does-not-exist-xyz"
+    doc_id = NONEXISTENT_DOCUMENT_ID
 
     # Act
-    response = client.get(f"/document/{doc_id}")
+    response = client.get(f"/project/{seeded_project.id}/documents/{doc_id}")
 
     # Assert
     assert response.status_code == 404
 
 
 # ---------------------------------------------------------------------------
-# PUT /document/{document_id}
+# PUT /project/{project_id}/documents/{document_id}
 # ---------------------------------------------------------------------------
 
 
-def test_update_document_valid_title_returns_200(client: TestClient, created_doc: dict):
+def test_update_document_valid_title_returns_200(
+    client: TestClient, created_doc: dict, seeded_project: Project
+):
     # Arrange
     payload = {"title": "Updated Title"}
 
     # Act
-    response = client.put(f"/document/{created_doc['id']}", json=payload)
+    response = client.put(
+        f"/project/{seeded_project.id}/documents/{created_doc['id']}", json=payload
+    )
 
     # Assert
     assert response.status_code == 200
@@ -172,51 +212,69 @@ def test_update_document_valid_title_returns_200(client: TestClient, created_doc
 
 
 def test_update_document_disallowed_extension_returns_422(
-    client: TestClient, created_doc: dict
+    client: TestClient, created_doc: dict, seeded_project: Project
 ):
     # Arrange
     payload = {"file_path": "/f/malware.exe"}
 
     # Act
-    response = client.put(f"/document/{created_doc['id']}", json=payload)
+    response = client.put(
+        f"/project/{seeded_project.id}/documents/{created_doc['id']}", json=payload
+    )
 
     # Assert
     assert response.status_code == 422
 
 
-def test_update_document_nonexistent_id_returns_404(client: TestClient):
+def test_update_document_nonexistent_id_returns_404(
+    client: TestClient, seeded_project: Project
+):
     # Arrange
     payload = {"title": "Ghost Update"}
 
     # Act
-    response = client.put("/document/does-not-exist-xyz", json=payload)
+    response = client.put(
+        f"/project/{seeded_project.id}/documents/{NONEXISTENT_DOCUMENT_ID}",
+        json=payload,
+    )
 
     # Assert
     assert response.status_code == 404
 
 
 # ---------------------------------------------------------------------------
-# DELETE /document/{document_id}
+# DELETE /project/{project_id}/documents/{document_id}
 # ---------------------------------------------------------------------------
 
 
-def test_delete_document_existing_id_returns_204(client: TestClient, created_doc: dict):
+def test_delete_document_existing_id_returns_204(
+    client: TestClient, created_doc: dict, seeded_project: Project
+):
     # Arrange — document seeded via fixture
 
     # Act
-    response = client.delete(f"/document/{created_doc['id']}")
+    response = client.delete(
+        f"/project/{seeded_project.id}/documents/{created_doc['id']}"
+    )
 
     # Assert — 204 and a follow-up GET must confirm removal
     assert response.status_code == 204
-    assert client.get(f"/document/{created_doc['id']}").status_code == 404
+    assert (
+        client.get(
+            f"/project/{seeded_project.id}/documents/{created_doc['id']}"
+        ).status_code
+        == 404
+    )
 
 
-def test_delete_document_nonexistent_id_returns_404(client: TestClient):
+def test_delete_document_nonexistent_id_returns_404(
+    client: TestClient, seeded_project: Project
+):
     # Arrange
-    doc_id = "does-not-exist-xyz"
+    doc_id = NONEXISTENT_DOCUMENT_ID
 
     # Act
-    response = client.delete(f"/document/{doc_id}")
+    response = client.delete(f"/project/{seeded_project.id}/documents/{doc_id}")
 
     # Assert
     assert response.status_code == 404
@@ -229,7 +287,6 @@ def test_delete_document_nonexistent_id_returns_404(client: TestClient):
 
 @pytest.fixture
 def no_auth(override_auth):
-    """Remove the autouse auth override so the real JWT validation runs."""
     from src.main import app
     from src.core.security import get_current_user
 
@@ -238,22 +295,50 @@ def no_auth(override_auth):
 
 
 def test_list_documents_without_token_returns_401(client: TestClient, no_auth):
+    # Arrange — auth override removed via no_auth fixture
+
+    # Act
     response = client.get(f"/project/{NONEXISTENT_PROJECT_ID}/documents")
+
+    # Assert
     assert response.status_code == 401
 
 
-def test_download_document_without_token_returns_401(client: TestClient, no_auth):
-    response = client.get("/document/any-id")
+def test_download_document_without_token_returns_401(
+    client: TestClient, no_auth, seeded_project: Project
+):
+    # Arrange — auth override removed via no_auth fixture
+
+    # Act
+    response = client.get(f"/project/{seeded_project.id}/documents/any-id")
+
+    # Assert
     assert response.status_code == 401
 
 
-def test_update_document_without_token_returns_401(client: TestClient, no_auth):
-    response = client.put("/document/any-id", json={"title": "x"})
+def test_update_document_without_token_returns_401(
+    client: TestClient, no_auth, seeded_project: Project
+):
+    # Arrange — auth override removed via no_auth fixture
+
+    # Act
+    response = client.put(
+        f"/project/{seeded_project.id}/documents/any-id", json={"title": "x"}
+    )
+
+    # Assert
     assert response.status_code == 401
 
 
-def test_delete_document_without_token_returns_401(client: TestClient, no_auth):
-    response = client.delete("/document/any-id")
+def test_delete_document_without_token_returns_401(
+    client: TestClient, no_auth, seeded_project: Project
+):
+    # Arrange — auth override removed via no_auth fixture
+
+    # Act
+    response = client.delete(f"/project/{seeded_project.id}/documents/any-id")
+
+    # Assert
     assert response.status_code == 401
 
 
@@ -263,16 +348,197 @@ def test_delete_document_without_token_returns_401(client: TestClient, no_auth):
 
 
 def test_list_documents_nonexistent_project_returns_404(client: TestClient):
+    # Arrange — no project with this ID exists
+
+    # Act
     response = client.get(f"/project/{NONEXISTENT_PROJECT_ID}/documents")
+
+    # Assert
     assert response.status_code == 404
 
 
 def test_upload_document_nonexistent_project_returns_404(client: TestClient):
+    # Arrange
+    payload = {"title": "Doc", "file_path": "/f/file.pdf"}
+
+    # Act
     response = client.post(
         f"/project/{NONEXISTENT_PROJECT_ID}/documents",
-        json={"title": "Doc", "file_path": "/f/file.pdf"},
+        json=payload,
     )
+
+    # Assert
     assert response.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Role-based access — 403 for users with no project membership
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def as_no_access(no_access_user: User):
+    from src.main import app
+    from src.core.security import get_current_user
+
+    app.dependency_overrides[get_current_user] = lambda: no_access_user.id
+    yield
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_no_access_user_cannot_list_documents(
+    client: TestClient, seeded_project: Project, as_no_access
+):
+    # Arrange — user has no membership in the project
+
+    # Act
+    response = client.get(f"/project/{seeded_project.id}/documents")
+
+    # Assert
+    assert response.status_code == 403
+
+
+def test_no_access_user_cannot_upload_document(
+    client: TestClient, seeded_project: Project, as_no_access
+):
+    # Arrange
+    payload = {"title": "Doc", "file_path": "/f/file.pdf"}
+
+    # Act
+    response = client.post(
+        f"/project/{seeded_project.id}/documents",
+        json=payload,
+    )
+
+    # Assert
+    assert response.status_code == 403
+
+
+def test_no_access_user_cannot_download_document(
+    client: TestClient, created_doc: dict, seeded_project: Project, as_no_access
+):
+    # Arrange — document seeded by owner via fixture
+
+    # Act
+    response = client.get(f"/project/{seeded_project.id}/documents/{created_doc['id']}")
+
+    # Assert
+    assert response.status_code == 403
+
+
+def test_no_access_user_cannot_update_document(
+    client: TestClient, created_doc: dict, seeded_project: Project, as_no_access
+):
+    # Arrange
+    payload = {"title": "Hijack"}
+
+    # Act
+    response = client.put(
+        f"/project/{seeded_project.id}/documents/{created_doc['id']}",
+        json=payload,
+    )
+
+    # Assert
+    assert response.status_code == 403
+
+
+def test_no_access_user_cannot_delete_document(
+    client: TestClient, created_doc: dict, seeded_project: Project, as_no_access
+):
+    # Arrange — document seeded by owner via fixture
+
+    # Act
+    response = client.delete(
+        f"/project/{seeded_project.id}/documents/{created_doc['id']}"
+    )
+
+    # Assert
+    assert response.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# Role-based access — participant can read and modify, but not delete
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def as_participant(participant_user: User):
+    from src.main import app
+    from src.core.security import get_current_user
+
+    app.dependency_overrides[get_current_user] = lambda: participant_user.id
+    yield
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_participant_can_list_documents(
+    client: TestClient, seeded_project: Project, as_participant
+):
+    # Arrange — participant membership seeded via fixture
+
+    # Act
+    response = client.get(f"/project/{seeded_project.id}/documents")
+
+    # Assert
+    assert response.status_code == 200
+
+
+def test_participant_can_upload_document(
+    client: TestClient, seeded_project: Project, as_participant
+):
+    # Arrange
+    payload = {"title": "Participant Doc", "file_path": "/f/part.pdf"}
+
+    # Act
+    response = client.post(
+        f"/project/{seeded_project.id}/documents",
+        json=payload,
+    )
+
+    # Assert
+    assert response.status_code == 201
+
+
+def test_participant_can_download_document(
+    client: TestClient, created_doc: dict, seeded_project: Project, as_participant
+):
+    # Arrange — document seeded by owner via fixture
+
+    # Act
+    response = client.get(f"/project/{seeded_project.id}/documents/{created_doc['id']}")
+
+    # Assert
+    assert response.status_code == 200
+
+
+def test_participant_can_update_document(
+    client: TestClient, created_doc: dict, seeded_project: Project, as_participant
+):
+    # Arrange
+    payload = {"title": "Participant Edit"}
+
+    # Act
+    response = client.put(
+        f"/project/{seeded_project.id}/documents/{created_doc['id']}",
+        json=payload,
+    )
+
+    # Assert
+    assert response.status_code == 200
+
+
+def test_participant_cannot_delete_document(
+    client: TestClient, created_doc: dict, seeded_project: Project, as_participant
+):
+    # Arrange — document seeded by owner via fixture
+
+    # Act
+    response = client.delete(
+        f"/project/{seeded_project.id}/documents/{created_doc['id']}"
+    )
+
+    # Assert
+    assert response.status_code == 403
 
 
 # ---------------------------------------------------------------------------
@@ -285,11 +551,17 @@ def test_delete_project_removes_its_documents(
 ):
     # Arrange — document exists and is reachable
     doc_id = created_doc["id"]
-    assert client.get(f"/document/{doc_id}").status_code == 200
+    assert (
+        client.get(f"/project/{seeded_project.id}/documents/{doc_id}").status_code
+        == 200
+    )
 
     # Act — delete the parent project
     response = client.delete(f"/project/{seeded_project.id}")
     assert response.status_code == 200
 
     # Assert — document is gone, no orphan remains
-    assert client.get(f"/document/{doc_id}").status_code == 404
+    assert (
+        client.get(f"/project/{seeded_project.id}/documents/{doc_id}").status_code
+        == 404
+    )
