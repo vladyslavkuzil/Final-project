@@ -2,7 +2,7 @@ import uuid
 from pathlib import Path
 
 import pytest
-from unittest.mock import patch
+from unittest.mock import Mock, call, patch
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -39,6 +39,9 @@ class InMemoryStorage:
         if path not in self.files:
             raise FileNotFoundError(path)
         yield self.files[path]
+
+    def exists(self, path):
+        return path in self.files
 
     def delete(self, path):
         self.files.pop(path, None)
@@ -247,6 +250,21 @@ def test_download_document_nonexistent_id_returns_404(
     assert response.status_code == 404
 
 
+def test_download_document_missing_file_returns_404(
+    client: TestClient, seeded_project: Project, storage_override
+):
+    # Arrange — a document whose stored file has gone missing (e.g. volume reset)
+    r = _upload(client, seeded_project.id, title="Gone", filename="gone.pdf")
+    doc_id = r.json()["id"]
+    storage_override.delete(r.json()["file_path"])
+
+    # Act
+    response = client.get(f"/project/{seeded_project.id}/documents/{doc_id}")
+
+    # Assert — a clean 404, not a broken 200 stream
+    assert response.status_code == 404
+
+
 # ---------------------------------------------------------------------------
 # PUT /project/{project_id}/documents/{document_id}
 # ---------------------------------------------------------------------------
@@ -335,6 +353,47 @@ def test_delete_document_nonexistent_id_returns_404(
 
     # Assert
     assert response.status_code == 404
+
+
+def test_delete_document_unlinks_file_only_after_commit():
+    # Arrange — the stored file must be removed strictly after the DB commit.
+    from src.modules.documents import services
+
+    db = Mock()
+    storage = Mock()
+    doc = Mock()
+    doc.file_path = "stored.pdf"
+    # Record commit and delete on a shared parent so their relative order is visible.
+    manager = Mock()
+    manager.attach_mock(db.commit, "commit")
+    manager.attach_mock(storage.delete, "storage_delete")
+
+    # Act
+    with patch.object(services, "get_document", return_value=doc):
+        result = services.delete_document(db, storage, "doc-1", "proj-1")
+
+    # Assert — committed, then unlinked, in that order (with the right key)
+    assert result is True
+    assert manager.mock_calls == [call.commit(), call.storage_delete("stored.pdf")]
+
+
+def test_delete_document_keeps_file_when_commit_fails():
+    # Arrange — commit blows up after the row delete is staged.
+    from src.modules.documents import services
+
+    db = Mock()
+    db.commit.side_effect = RuntimeError("boom")
+    storage = Mock()
+    doc = Mock()
+    doc.file_path = "stored.pdf"
+
+    # Act / Assert — the error propagates, the file is NOT removed, and we roll back.
+    with patch.object(services, "get_document", return_value=doc):
+        with pytest.raises(RuntimeError):
+            services.delete_document(db, storage, "doc-1", "proj-1")
+
+    db.rollback.assert_called_once()
+    storage.delete.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

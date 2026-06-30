@@ -65,6 +65,18 @@ async function request(path: string, options: RequestInit = {}): Promise<Respons
   const res = await fetch(`${BASE}${path}`, { ...options, headers });
 
   if (!res.ok) {
+    if (res.status === 401) {
+      // Token missing/expired/invalid: clear it and force re-auth so the user
+      // can't get stranded on a protected page whose data silently failed to
+      // load. (login() uses raw fetch, so its 401s don't hit this path.)
+      clearAuth();
+      if (
+        typeof window !== "undefined" &&
+        window.location.pathname !== "/login"
+      ) {
+        window.location.assign("/login");
+      }
+    }
     let detail = res.statusText;
     try {
       detail = extractDetail(await res.json(), detail);

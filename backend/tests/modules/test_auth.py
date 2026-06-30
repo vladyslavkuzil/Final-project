@@ -212,7 +212,10 @@ class TestFindUserByEmail:
         data = response.json()
         assert data["email"] == "finder@example.com"
         assert "id" in data
+        # Sensitive/internal fields must not leak through the public lookup.
         assert "hashed_password" not in data
+        assert "is_active" not in data
+        assert set(data.keys()) == {"id", "email"}
 
     def test_find_missing_user_returns_404(self, client: TestClient, db: Session):
         # Arrange

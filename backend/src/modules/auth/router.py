@@ -5,7 +5,7 @@ from pydantic import EmailStr
 from sqlalchemy.orm import Session
 from src.core.database import get_db
 from src.core.security import get_current_user
-from .schemas import UserCreate, UserResponse, Token, RefreshRequest
+from .schemas import UserCreate, UserResponse, PublicUser, Token, RefreshRequest
 from .services import register_user, authenticate_user, get_user_by_email
 from .security import create_access_token, create_refresh_token
 from src.core.config import SECRET_KEY, ALGORITHM
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 users_router = APIRouter(prefix="/users", tags=["users"])
 
 
-@users_router.get("", response_model=UserResponse)
+@users_router.get("", response_model=PublicUser)
 def find_user_by_email(
     email: EmailStr,
     db: Session = Depends(get_db),

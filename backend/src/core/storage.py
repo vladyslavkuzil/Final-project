@@ -29,6 +29,10 @@ class StorageBackend(Protocol):
         """Return an async byte stream for the stored object at ``path``."""
         ...
 
+    def exists(self, path: str) -> bool:
+        """Return whether a stored object exists at ``path``."""
+        ...
+
     def delete(self, path: str) -> None:
         """Remove the stored object at ``path``."""
         ...
@@ -57,6 +61,13 @@ class LocalStorageBackend:
         with full.open("rb") as src:
             while chunk := src.read(_CHUNK_SIZE):
                 yield chunk
+
+    def exists(self, path: str) -> bool:
+        try:
+            return self._resolve(path).is_file()
+        except ValueError:
+            # An invalid/unresolvable key can't refer to a stored object.
+            return False
 
     def delete(self, path: str) -> None:
         self._resolve(path).unlink(missing_ok=True)

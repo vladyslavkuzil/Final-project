@@ -256,8 +256,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     try {
       user = await api.get<ApiUser>(`/users?email=${encodeURIComponent(email)}`);
     } catch (e) {
-      if (e instanceof ApiError && e.status === 404) {
-        throw new Error("No user found with that email.");
+      if (e instanceof ApiError) {
+        if (e.status === 404) throw new Error("No user found with that email.");
+        if (e.status === 422) throw new Error("Enter a valid email address.");
       }
       throw e;
     }

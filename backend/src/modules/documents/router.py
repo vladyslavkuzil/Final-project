@@ -71,6 +71,14 @@ def download_document(
             status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
         )
 
+    # Resolve the stored file up front: the byte stream is produced lazily, so a
+    # missing/invalid key would otherwise raise mid-stream, after the 200 status
+    # and headers have already been sent. Check now to return a clean 404.
+    if not storage.exists(doc.file_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Document file not found"
+        )
+
     return StreamingResponse(
         storage.get(doc.file_path),
         media_type="application/octet-stream",

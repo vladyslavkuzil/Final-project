@@ -99,11 +99,14 @@ def delete_document(
     doc = get_document(db, document_id, project_id)
     if not doc:
         return False
-    storage.delete(doc.file_path)
+    file_path = doc.file_path
     try:
         db.delete(doc)
         db.commit()
     except Exception:
         db.rollback()
         raise
+    # Remove the stored file only after the row is durably gone, so a commit
+    # failure can't orphan a live document whose bytes have already been deleted.
+    storage.delete(file_path)
     return True

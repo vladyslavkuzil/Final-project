@@ -255,12 +255,13 @@ class ProjectServiceUnitTests(unittest.TestCase):
             services.leave_project(self.db, project.id, "owner-id")
 
     def test_leave_project_removes_membership_and_user(self):
-        # Arrange — a participant who belongs to someone else's project.
-        # leave_project makes three lookups in order: project, membership, user.
+        # Arrange — a participant who belongs to someone else's project alongside
+        # the owner. leave_project makes three lookups: project, membership, user.
         project = SimpleProject(admin_id="owner-id")
         membership = Mock()
+        owner = make_user(user_id="owner-id")
         user = make_user(user_id="user-2")
-        project.users = [user]
+        project.users = [owner, user]
         self.db.query.side_effect = [
             make_query(project),
             make_query(membership),
@@ -274,6 +275,26 @@ class ProjectServiceUnitTests(unittest.TestCase):
         self.assertNotIn(user, project.users)
         self.db.delete.assert_called_once_with(membership)
         self.db.commit.assert_called_once()
+
+    def test_leave_project_invalidates_every_member_cache(self):
+        # Arrange — a project with the owner and the leaving participant.
+        project = SimpleProject(admin_id="owner-id")
+        membership = Mock()
+        owner = make_user(user_id="owner-id")
+        user = make_user(user_id="user-2")
+        project.users = [owner, user]
+        self.db.query.side_effect = [
+            make_query(project),
+            make_query(membership),
+            make_query(user),
+        ]
+
+        # Act
+        services.leave_project(self.db, project.id, "user-2")
+
+        # Assert — the remaining owner's cached list is busted too, not just the leaver's
+        self.mock_redis.delete.assert_any_call("user:user-2:projects")
+        self.mock_redis.delete.assert_any_call("user:owner-id:projects")
 
 
 # ---------------------------------------------------------------------------

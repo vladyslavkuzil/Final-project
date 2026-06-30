@@ -55,6 +55,18 @@ def test_save_then_get_round_trips_bytes(tmp_path):
     assert key != "report.pdf"
 
 
+def test_exists_reflects_presence(tmp_path):
+    # Arrange — a backend with one saved file
+    backend = LocalStorageBackend(str(tmp_path))
+    key = save_file(backend, b"data", "a.txt")
+
+    # Act / Assert — exists() tracks the file through its lifecycle
+    assert backend.exists(key) is True
+    assert backend.exists("never-saved.pdf") is False
+    backend.delete(key)
+    assert backend.exists(key) is False
+
+
 def test_delete_removes_file(tmp_path):
     # Arrange — a saved file
     backend = LocalStorageBackend(str(tmp_path))

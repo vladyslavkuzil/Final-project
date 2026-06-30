@@ -390,6 +390,10 @@ def leave_project(db: Session, project_id: str, user_id: str) -> None:
     )
     user = db.query(User).filter(User.id == user_id).one_or_none()
 
+    # Capture the affected members before mutating so every member's cached
+    # project list is invalidated, not just the leaver's.
+    affected_user_ids = {u.id for u in project.users} | {user_id}
+
     try:
         if user is not None and user in project.users:
             project.users.remove(user)
@@ -400,5 +404,6 @@ def leave_project(db: Session, project_id: str, user_id: str) -> None:
         db.rollback()
         raise
 
-    redis_client.delete(f"user:{user_id}:projects")
+    for uid in affected_user_ids:
+        redis_client.delete(f"user:{uid}:projects")
     redis_client.delete(f"user:{user_id}:project:{project_id}")
