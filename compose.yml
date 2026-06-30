@@ -21,6 +21,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
 
   api-test:
     <<: *api-base
@@ -32,6 +34,8 @@ services:
       DATABASE_URL: ${TEST_DATABASE_URL}
     depends_on:
       db-test:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   db:
@@ -83,6 +87,19 @@ services:
     env_file: .env
     environment:
       NEXT_TELEMETRY_DISABLED: "1"
+
+  redis:
+    profiles: [dev, test]
+    image: redis:7-alpine
+    container_name: project-dashboard-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-password}"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-password}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
   postgres_data:
