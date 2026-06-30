@@ -182,6 +182,59 @@ class TestLogin:
 
 
 # ---------------------------------------------------------------------------
+# GET /users — find user by email
+# ---------------------------------------------------------------------------
+
+
+class TestFindUserByEmail:
+    def _auth_header(self, client: TestClient) -> dict:
+        client.post(
+            "/auth/register",
+            json={"email": "finder@example.com", "password": TEST_PASSWORD},
+        )
+        r = client.post(
+            "/auth/login",
+            data={"username": "finder@example.com", "password": TEST_PASSWORD},
+        )
+        return {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+    def test_find_existing_user_returns_200(self, client: TestClient, db: Session):
+        # Arrange
+        headers = self._auth_header(client)
+
+        # Act
+        response = client.get(
+            "/users", params={"email": "finder@example.com"}, headers=headers
+        )
+
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
+        assert data["email"] == "finder@example.com"
+        assert "id" in data
+        assert "hashed_password" not in data
+
+    def test_find_missing_user_returns_404(self, client: TestClient, db: Session):
+        # Arrange
+        headers = self._auth_header(client)
+
+        # Act
+        response = client.get(
+            "/users", params={"email": "ghost@example.com"}, headers=headers
+        )
+
+        # Assert
+        assert response.status_code == 404
+
+    def test_find_user_without_token_returns_401(self, client: TestClient, db: Session):
+        # Act
+        response = client.get("/users", params={"email": "finder@example.com"})
+
+        # Assert
+        assert response.status_code == 401
+
+
+# ---------------------------------------------------------------------------
 # Unit tests — create_refresh_token
 # ---------------------------------------------------------------------------
 
