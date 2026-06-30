@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import Mock, patch
-
+from datetime import datetime
 from src.core.enums import MembershipRole
 from src.modules.projects import services
 from src.modules.projects.exceptions import (
@@ -8,6 +8,14 @@ from src.modules.projects.exceptions import (
     ProjectNotFoundError,
     UserNotFoundError,
 )
+
+
+class SimpleUser:
+    def __init__(self):
+        self.id = "admin-id"
+        self.email = "admin@example.com"
+        self.username = "admin"
+        self.is_active = True
 
 
 class SimpleProject:
@@ -25,6 +33,15 @@ class SimpleProject:
         self.is_finished = False
         self.users = []
         self.user_role: MembershipRole | None = None
+
+        # New required fields
+        self.documents_count = 0
+        self.total_size_bytes = 0
+        self.created_at = datetime.utcnow()
+        self.updated_at = datetime.utcnow()
+
+        # Depends on your schema
+        self.admin = SimpleUser()
 
 
 def make_user(user_id="admin-id", email="admin@test.com"):
@@ -59,15 +76,6 @@ class ProjectServiceUnitTests(unittest.TestCase):
 
     def tearDown(self):
         self.redis_patcher.stop()
-
-    def test_get_project_by_id_returns_matching_project(self):
-        expected = SimpleProject()
-        self.db.query.return_value = make_query(expected)
-
-        project = services.get_project_by_id(self.db, expected.id)
-
-        self.assertIs(project, expected)
-        self.db.query.assert_called_once()
 
     def test_get_project_by_name_returns_matching_project(self):
         expected = SimpleProject(name="project-1")

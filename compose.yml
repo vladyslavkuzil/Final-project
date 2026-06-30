@@ -35,6 +35,8 @@ services:
     depends_on:
       db-test:
         condition: service_healthy
+      redis:
+        condition: service_healthy
 
   db:
     profiles: [dev]
@@ -87,14 +89,14 @@ services:
       NEXT_TELEMETRY_DISABLED: "1"
 
   redis:
-    profiles: [dev]
+    profiles: [dev, test]
     image: redis:7-alpine
     container_name: project-dashboard-redis
     ports:
       - "6379:6379"
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-password}"]
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-password}", "ping"]
       interval: 5s
       timeout: 5s
       retries: 10
