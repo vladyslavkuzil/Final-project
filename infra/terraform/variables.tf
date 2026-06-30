@@ -45,3 +45,12 @@ variable "availability_zones" {
   default     = ["eu-north-1a", "eu-north-1b"]
 }
 
+variable "db_username" {
+  type      = string
+  sensitive = true
+}
+
+variable "db_password" {
+  type      = string
+  sensitive = true
+}
