@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { Hov } from "../../components/infoboard/ui";
 import { InviteModal, SettingsModal } from "../../components/infoboard/modals";
-import { useStore } from "../../lib/store";
+import { useStore, type FileItem } from "../../lib/store";
+import { getToken } from "../../lib/api";
 
 const initialOf = (email: string) => (email || "?").charAt(0).toUpperCase();
 
@@ -24,40 +25,103 @@ function navStyle(active: boolean): React.CSSProperties {
 
 export default function ProjectDashboard() {
   const router = useRouter();
-  const { projects, deleteProject, leaveProject, deleteFile, renameFile, uploadFile, saveSettings, sendInvite } =
-    useStore();
+  const {
+    projects,
+    loaded,
+    deleteProject,
+    leaveProject,
+    loadProjectDocuments,
+    deleteFile,
+    renameFile,
+    uploadFile,
+    downloadFile,
+    saveSettings,
+    inviteByEmail,
+  } = useStore();
 
   const id = typeof router.query.id === "string" ? router.query.id : "";
   const project = projects.find((p) => p.id === id);
 
   const [tab, setTab] = useState<"files" | "members">("files");
   const [modal, setModal] = useState<"invite" | "settings" | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (router.isReady && id && !project) router.replace("/projects");
-  }, [router, router.isReady, id, project]);
+    if (!getToken()) router.replace("/login");
+  }, [router]);
+
+  useEffect(() => {
+    if (router.isReady && loaded && id && !project) router.replace("/projects");
+  }, [router, router.isReady, loaded, id, project]);
+
+  // Documents aren't part of the projects list payload — fetch them on view.
+  useEffect(() => {
+    if (id && project) loadProjectDocuments(id).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, !!project]);
 
   if (!project) return null;
 
   const isAdmin = project.myRole === "Admin";
   const projInitial = initialOf(project.name.replace(/^Project\s+/i, ""));
 
-  const onDeleteProject = () => {
+  const onDeleteProject = async () => {
     if (!window.confirm('Delete "' + project.name + '"? This cannot be undone.')) return;
-    deleteProject(project.id);
-    router.push("/projects");
+    try {
+      await deleteProject(project.id);
+      router.push("/projects");
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Failed to delete project");
+    }
   };
 
-  const onLeaveProject = () => {
+  const onLeaveProject = async () => {
     if (!window.confirm('Leave "' + project.name + '"? You will lose access to its files.')) return;
-    leaveProject(project.id);
-    router.push("/projects");
+    try {
+      await leaveProject(project.id);
+      router.push("/projects");
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Failed to leave project");
+    }
   };
 
-  const onRename = (name: string) => {
-    const next = window.prompt("Rename file", name);
-    if (!next || next === name) return;
-    renameFile(project.id, name, next);
+  const onRename = async (f: FileItem) => {
+    const next = window.prompt("Rename document", f.name);
+    if (!next || next === f.name) return;
+    try {
+      await renameFile(project.id, f.id, next);
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Failed to rename document");
+    }
+  };
+
+  const onDelete = async (f: FileItem) => {
+    try {
+      await deleteFile(project.id, f.id);
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Failed to delete document");
+    }
+  };
+
+  const onDownload = async (f: FileItem) => {
+    try {
+      await downloadFile(project.id, f.id, f.name);
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Failed to download document");
+    }
+  };
+
+  const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file later
+    if (!file) return;
+    const title = window.prompt("Document title", file.name);
+    if (title === null) return;
+    try {
+      await uploadFile(project.id, file, title.trim() || file.name);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Failed to upload document");
+    }
   };
 
   const iconBtn: React.CSSProperties = {
@@ -236,26 +300,35 @@ export default function ProjectDashboard() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22 }}>
                 <h1 style={{ margin: 0, fontSize: 21, fontWeight: 600, letterSpacing: "-.4px" }}>Files</h1>
                 {isAdmin && (
-                  <Hov
-                    as="button"
-                    onClick={() => uploadFile(project.id)}
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 500,
-                      color: "#fff",
-                      background: "#2f6fed",
-                      border: "none",
-                      borderRadius: 8,
-                      padding: "8px 14px",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                    }}
-                    hoverStyle={{ background: "#2560d8" }}
-                  >
-                    <span style={{ fontSize: 14, marginTop: -1 }}>↑</span>Upload Document
-                  </Hov>
+                  <>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".pdf,.docx,.xlsx,.txt"
+                      onChange={onPickFile}
+                      style={{ display: "none" }}
+                    />
+                    <Hov
+                      as="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 500,
+                        color: "#fff",
+                        background: "#2f6fed",
+                        border: "none",
+                        borderRadius: 8,
+                        padding: "8px 14px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                      hoverStyle={{ background: "#2560d8" }}
+                    >
+                      <span style={{ fontSize: 14, marginTop: -1 }}>↑</span>Upload Document
+                    </Hov>
+                  </>
                 )}
               </div>
 
@@ -334,6 +407,7 @@ export default function ProjectDashboard() {
                         <Hov
                           as="button"
                           title="Download"
+                          onClick={() => onDownload(f)}
                           style={{ ...iconBtn, color: "#6b6b67", fontSize: 13 }}
                           hoverStyle={{ background: "#f4f4f2", color: "#37352f" }}
                         >
@@ -344,7 +418,7 @@ export default function ProjectDashboard() {
                             <Hov
                               as="button"
                               title="Rename"
-                              onClick={() => onRename(f.name)}
+                              onClick={() => onRename(f)}
                               style={{ ...iconBtn, color: "#6b6b67", fontSize: 12 }}
                               hoverStyle={{ background: "#f4f4f2", color: "#37352f" }}
                             >
@@ -353,7 +427,7 @@ export default function ProjectDashboard() {
                             <Hov
                               as="button"
                               title="Delete"
-                              onClick={() => deleteFile(project.id, f.name)}
+                              onClick={() => onDelete(f)}
                               style={{ ...iconBtn, color: "#c0392b", fontSize: 12 }}
                               hoverStyle={{ background: "#fdf2f1", borderColor: "#e8b9b3" }}
                             >
@@ -546,20 +620,14 @@ export default function ProjectDashboard() {
       {modal === "invite" && (
         <InviteModal
           onClose={() => setModal(null)}
-          onSend={(userId) => {
-            sendInvite(project.id, userId);
-            setModal(null);
-          }}
+          onSend={(email) => inviteByEmail(project.id, email)}
         />
       )}
       {modal === "settings" && (
         <SettingsModal
           project={project}
           onClose={() => setModal(null)}
-          onSave={(patch) => {
-            saveSettings(project.id, patch);
-            setModal(null);
-          }}
+          onSave={(patch) => saveSettings(project.id, patch)}
         />
       )}
     </div>
