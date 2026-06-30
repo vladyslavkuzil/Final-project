@@ -76,19 +76,27 @@ async function request(path: string, options: RequestInit = {}): Promise<Respons
   return res;
 }
 
+// Parse a JSON body, tolerating empty/204 responses (e.g. leave-project),
+// which have nothing to parse and would otherwise throw on res.json().
+async function parseJson<T>(res: Response): Promise<T> {
+  if (res.status === 204) return undefined as T;
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
+}
+
 export const api = {
-  get: <T>(path: string): Promise<T> => request(path).then((r) => r.json()),
+  get: <T>(path: string): Promise<T> => request(path).then((r) => parseJson<T>(r)),
   post: <T>(path: string, body?: unknown): Promise<T> =>
     request(path, { method: "POST", body: JSON.stringify(body ?? {}) }).then((r) =>
-      r.json()
+      parseJson<T>(r)
     ),
   put: <T>(path: string, body?: unknown): Promise<T> =>
     request(path, { method: "PUT", body: JSON.stringify(body ?? {}) }).then((r) =>
-      r.json()
+      parseJson<T>(r)
     ),
   del: (path: string): Promise<Response> => request(path, { method: "DELETE" }),
   postForm: <T>(path: string, form: FormData): Promise<T> =>
-    request(path, { method: "POST", body: form }).then((r) => r.json()),
+    request(path, { method: "POST", body: form }).then((r) => parseJson<T>(r)),
   blob: (path: string): Promise<Blob> => request(path).then((r) => r.blob()),
 };
 
