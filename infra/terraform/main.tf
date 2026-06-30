@@ -20,6 +20,10 @@ module "database" {
   db_name     = "final_project"
   db_username = var.db_username
   db_password = var.db_password
+
+  multi_az             = false # set to true for production
+  deletion_protection  = false # set to true for production
+  skip_final_snapshot  = true  # set to false for production
 }
 
 # ─── SECURITY GROUP: ALB ────────────────────────────────────────────────────
