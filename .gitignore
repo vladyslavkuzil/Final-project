@@ -84,6 +84,7 @@ infra/*.tfstate.*
 infra/crash.log
 infra/*.tfvars
 infra/*.tfvars.json
+**/.terraform.lock.hcl
 
 # AWS / serverless build artifacts
 .aws-sam/
