@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 
 import secrets
-from psycopg2.errors import UniqueViolation
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from src.core.cache import redis_client
@@ -151,14 +150,9 @@ def join_project(db: Session, code: str, user_id: str):
     try:
         _add_user(db=db, project_id=project_id, user_id=user_id)
         db.commit()
-    except IntegrityError as e:
+    except IntegrityError:
         db.rollback()
-        if isinstance(e.orig, UniqueViolation):
-            raise AlreadyMemberError
-        raise
-    except Exception:
-        db.rollback()
-        raise
+        raise AlreadyMemberError
 
     redis_client.delete(f"user:{user_id}:projects")
     redis_client.delete(f"project:{project_id}")
@@ -177,14 +171,9 @@ def invite_user_by_email(db: Session, project_id: str, email: str):
     try:
         _add_user(db=db, project_id=project_id, user_id=user.id)
         db.commit()
-    except IntegrityError as e:
+    except IntegrityError:
         db.rollback()
-        if isinstance(e.orig, UniqueViolation):
-            raise AlreadyMemberError
-        raise
-    except Exception:
-        db.rollback()
-        raise
+        raise AlreadyMemberError
 
     redis_client.delete(f"user:{user.id}:projects")
     redis_client.delete(f"project:{project_id}")
