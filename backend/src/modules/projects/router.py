@@ -62,7 +62,7 @@ def list_projects(
 def retrieve_project_id(
     project_id: str,
     db: Session = Depends(get_db),
-    user_role: MembershipRole = Depends(require_role()),
+    access: AccessContext = Depends(require_role()),
 ):
     project = services.get_project_by_id(db, project_id)
 
@@ -70,7 +70,7 @@ def retrieve_project_id(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Project not found."
         )
-    project.user_role = user_role
+    project["user_role"] = access.role
 
     return project
 

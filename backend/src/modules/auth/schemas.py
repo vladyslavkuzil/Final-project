@@ -15,9 +15,7 @@ class PublicUser(BaseModel):
 
     id: str
     email: EmailStr
-
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class UserResponse(PublicUser):
