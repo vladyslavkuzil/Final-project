@@ -56,3 +56,26 @@ variable "db_password" {
   type      = string
   sensitive = true
 }
+
+variable "backend_image" {
+  type = string
+}
+
+variable "frontend_image" {
+  type = string
+}
+
+variable "database_url" {
+  type      = string
+  sensitive = true
+}
+
+variable "secret_key" {
+  type      = string
+  sensitive = true
+}
+
+variable "algorithm" {
+  type    = string
+  default = "HS256"
+}

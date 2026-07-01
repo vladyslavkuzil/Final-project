@@ -18,9 +18,9 @@ variable "rds_security_group_id" {
 # ─── ENGINE ─────────────────────────────────────────────────────────────────
 
 variable "engine_version" {
-  description = "PostgreSQL engine version"
+  description = "PostgreSQL major version — AWS selects the latest available minor version in the region"
   type        = string
-  default     = "16.4"
+  default     = "16"
 }
 
 variable "instance_class" {

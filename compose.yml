@@ -9,6 +9,7 @@ x-api-base: &api-base
   volumes:
     - ./backend:/app/backend
     - /app/backend/.venv
+    - uploads_data:/app/uploads
 
 services:
   api:
@@ -105,3 +106,4 @@ volumes:
   postgres_data:
   postgres_test_data:
   frontend_node_modules:
+  uploads_data:

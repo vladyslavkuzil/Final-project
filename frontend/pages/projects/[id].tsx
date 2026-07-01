@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
+import { ProjectChatPanel } from "../../components/chat/project-chat";
 import { Hov } from "../../components/infoboard/ui";
 import { InviteModal, SettingsModal } from "../../components/infoboard/modals";
-import { useStore } from "../../lib/store";
+import { useStore, type FileItem } from "../../lib/store";
+import { getToken } from "../../lib/api";
 
 const initialOf = (email: string) => (email || "?").charAt(0).toUpperCase();
 
@@ -24,40 +26,94 @@ function navStyle(active: boolean): React.CSSProperties {
 
 export default function ProjectDashboard() {
   const router = useRouter();
-  const { projects, deleteProject, leaveProject, deleteFile, renameFile, uploadFile, saveSettings, sendInvite } =
-    useStore();
+  const {
+    projects,
+    loaded,
+    deleteProject,
+    leaveProject,
+    loadProjectDocuments,
+    deleteFile,
+    renameFile,
+    uploadFile,
+    downloadFile,
+    saveSettings,
+    inviteByEmail,
+  } = useStore();
 
   const id = typeof router.query.id === "string" ? router.query.id : "";
   const project = projects.find((p) => p.id === id);
 
-  const [tab, setTab] = useState<"files" | "members">("files");
+  const [tab, setTab] = useState<"files" | "members" | "chat">("files");
   const [modal, setModal] = useState<"invite" | "settings" | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (router.isReady && id && !project) router.replace("/projects");
-  }, [router, router.isReady, id, project]);
+    if (!getToken()) router.replace("/login");
+  }, [router]);
+
+  useEffect(() => {
+    if (router.isReady && loaded && id && !project) router.replace("/projects");
+  }, [router, router.isReady, loaded, id, project]);
+
+  // Documents aren't part of the projects list payload — fetch them on view.
+  useEffect(() => {
+    if (id && project) loadProjectDocuments(id).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, !!project]);
 
   if (!project) return null;
 
   const isAdmin = project.myRole === "Admin";
   const projInitial = initialOf(project.name.replace(/^Project\s+/i, ""));
 
-  const onDeleteProject = () => {
+  // Run an async action, surfacing any failure as an alert. Returns whether it
+  // succeeded so callers can navigate only on success.
+  const runOrAlert = async (fn: () => Promise<void>, fallback: string): Promise<boolean> => {
+    try {
+      await fn();
+      return true;
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : fallback);
+      return false;
+    }
+  };
+
+  const onDeleteProject = async () => {
     if (!window.confirm('Delete "' + project.name + '"? This cannot be undone.')) return;
-    deleteProject(project.id);
-    router.push("/projects");
+    if (await runOrAlert(() => deleteProject(project.id), "Failed to delete project")) {
+      router.push("/projects");
+    }
   };
 
-  const onLeaveProject = () => {
+  const onLeaveProject = async () => {
     if (!window.confirm('Leave "' + project.name + '"? You will lose access to its files.')) return;
-    leaveProject(project.id);
-    router.push("/projects");
+    if (await runOrAlert(() => leaveProject(project.id), "Failed to leave project")) {
+      router.push("/projects");
+    }
   };
 
-  const onRename = (name: string) => {
-    const next = window.prompt("Rename file", name);
-    if (!next || next === name) return;
-    renameFile(project.id, name, next);
+  const onRename = async (f: FileItem) => {
+    const next = window.prompt("Rename document", f.name);
+    if (!next || next === f.name) return;
+    await runOrAlert(() => renameFile(project.id, f.id, next), "Failed to rename document");
+  };
+
+  const onDelete = (f: FileItem) =>
+    runOrAlert(() => deleteFile(project.id, f.id), "Failed to delete document");
+
+  const onDownload = (f: FileItem) =>
+    runOrAlert(() => downloadFile(project.id, f.id, f.name), "Failed to download document");
+
+  const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file later
+    if (!file) return;
+    const title = window.prompt("Document title", file.name);
+    if (title === null) return;
+    await runOrAlert(
+      () => uploadFile(project.id, file, title.trim() || file.name),
+      "Failed to upload document"
+    );
   };
 
   const iconBtn: React.CSSProperties = {
@@ -143,6 +199,9 @@ export default function ProjectDashboard() {
           <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <Hov as="a" onClick={() => setTab("files")} style={navStyle(tab === "files")} hoverStyle={{ background: "#efefec" }}>
               <span style={{ display: "flex", width: 16, justifyContent: "center" }}>▤</span>Files
+            </Hov>
+            <Hov as="a" onClick={() => setTab("chat")} style={navStyle(tab === "chat")} hoverStyle={{ background: "#efefec" }}>
+              <span style={{ display: "flex", width: 16, justifyContent: "center" }}>💬</span>Chat
             </Hov>
             <Hov
               as="a"
@@ -235,28 +294,33 @@ export default function ProjectDashboard() {
             <main style={{ padding: "30px 36px 90px", maxWidth: 980, width: "100%" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22 }}>
                 <h1 style={{ margin: 0, fontSize: 21, fontWeight: 600, letterSpacing: "-.4px" }}>Files</h1>
-                {isAdmin && (
-                  <Hov
-                    as="button"
-                    onClick={() => uploadFile(project.id)}
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 500,
-                      color: "#fff",
-                      background: "#2f6fed",
-                      border: "none",
-                      borderRadius: 8,
-                      padding: "8px 14px",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                    }}
-                    hoverStyle={{ background: "#2560d8" }}
-                  >
-                    <span style={{ fontSize: 14, marginTop: -1 }}>↑</span>Upload Document
-                  </Hov>
-                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.docx,.xlsx,.txt"
+                  onChange={onPickFile}
+                  style={{ display: "none" }}
+                />
+                <Hov
+                  as="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: "#fff",
+                    background: "#2f6fed",
+                    border: "none",
+                    borderRadius: 8,
+                    padding: "8px 14px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                  hoverStyle={{ background: "#2560d8" }}
+                >
+                  <span style={{ fontSize: 14, marginTop: -1 }}>↑</span>Upload Document
+                </Hov>
               </div>
 
               {project.files.length > 0 ? (
@@ -334,32 +398,31 @@ export default function ProjectDashboard() {
                         <Hov
                           as="button"
                           title="Download"
+                          onClick={() => onDownload(f)}
                           style={{ ...iconBtn, color: "#6b6b67", fontSize: 13 }}
                           hoverStyle={{ background: "#f4f4f2", color: "#37352f" }}
                         >
                           ↓
                         </Hov>
+                        <Hov
+                          as="button"
+                          title="Rename"
+                          onClick={() => onRename(f)}
+                          style={{ ...iconBtn, color: "#6b6b67", fontSize: 12 }}
+                          hoverStyle={{ background: "#f4f4f2", color: "#37352f" }}
+                        >
+                          ✎
+                        </Hov>
                         {isAdmin && (
-                          <>
-                            <Hov
-                              as="button"
-                              title="Rename"
-                              onClick={() => onRename(f.name)}
-                              style={{ ...iconBtn, color: "#6b6b67", fontSize: 12 }}
-                              hoverStyle={{ background: "#f4f4f2", color: "#37352f" }}
-                            >
-                              ✎
-                            </Hov>
-                            <Hov
-                              as="button"
-                              title="Delete"
-                              onClick={() => deleteFile(project.id, f.name)}
-                              style={{ ...iconBtn, color: "#c0392b", fontSize: 12 }}
-                              hoverStyle={{ background: "#fdf2f1", borderColor: "#e8b9b3" }}
-                            >
-                              🗑
-                            </Hov>
-                          </>
+                          <Hov
+                            as="button"
+                            title="Delete"
+                            onClick={() => onDelete(f)}
+                            style={{ ...iconBtn, color: "#c0392b", fontSize: 12 }}
+                            hoverStyle={{ background: "#fdf2f1", borderColor: "#e8b9b3" }}
+                          >
+                            🗑
+                          </Hov>
                         )}
                       </div>
                     </Hov>
@@ -496,70 +559,22 @@ export default function ProjectDashboard() {
               </div>
             </main>
           )}
-        </div>
 
-        {/* Chat widget (disabled) */}
-        <div
-          title="Coming soon"
-          style={{
-            position: "fixed",
-            bottom: 22,
-            right: 22,
-            opacity: 0.5,
-            filter: "grayscale(1)",
-            cursor: "not-allowed",
-            zIndex: 30,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 9,
-              background: "#fff",
-              border: "1px solid #e3e3df",
-              borderRadius: 24,
-              padding: "10px 16px 10px 13px",
-              boxShadow: "0 4px 14px rgba(15,15,15,.1)",
-            }}
-          >
-            <span
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: "50%",
-                background: "#2f6fed",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#fff",
-                fontSize: 14,
-              }}
-            >
-              💬
-            </span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#37352f" }}>Project Chat</span>
-          </div>
+          {tab === "chat" && <ProjectChatPanel projectId={project.id} projectName={project.name} />}
         </div>
       </div>
 
       {modal === "invite" && (
         <InviteModal
           onClose={() => setModal(null)}
-          onSend={(userId) => {
-            sendInvite(project.id, userId);
-            setModal(null);
-          }}
+          onSend={(email) => inviteByEmail(project.id, email)}
         />
       )}
       {modal === "settings" && (
         <SettingsModal
           project={project}
           onClose={() => setModal(null)}
-          onSave={(patch) => {
-            saveSettings(project.id, patch);
-            setModal(null);
-          }}
+          onSave={(patch) => saveSettings(project.id, patch)}
         />
       )}
     </div>

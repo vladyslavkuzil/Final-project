@@ -21,9 +21,10 @@ module "database" {
   db_username = var.db_username
   db_password = var.db_password
 
-  multi_az             = false # set to true for production
-  deletion_protection  = false # set to true for production
-  skip_final_snapshot  = true  # set to false for production
+  multi_az                = false # set to true for production
+  deletion_protection     = false # set to true for production
+  skip_final_snapshot     = true  # set to false for production
+  backup_retention_period = 0     # free tier limit; set to 7+ for production
 }
 
 # ─── SECURITY GROUP: ALB ────────────────────────────────────────────────────
@@ -70,11 +71,19 @@ resource "aws_security_group" "ecs" {
   vpc_id      = module.vpc.vpc_id
 
   ingress {
-    description     = "App port from ALB only"
+    description     = "Backend from ALB only"
     from_port       = 8000
     to_port         = 8000
     protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]  # ← security group chaining
+    security_groups = [aws_security_group.alb.id]
+  }
+
+  ingress {
+    description     = "Frontend from ALB only"
+    from_port       = 3000
+    to_port         = 3000
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
   }
 
   egress {
@@ -111,4 +120,35 @@ resource "aws_security_group" "rds" {
   }
 
   tags = { Name = "${var.project_name}-rds-sg" }
+}
+
+# ─── ALB MODULE ─────────────────────────────────────────────────────────────
+# Creates the load balancer, target groups, HTTP listener, and /api/* routing rule.
+# Must run before ECS so target group ARNs are available for service registration.
+
+module "alb" {
+  source = "./modules/alb"
+
+  project_name          = var.project_name
+  vpc_id                = module.vpc.vpc_id
+  public_subnet_ids     = module.vpc.public_subnet_ids
+  alb_security_group_id = aws_security_group.alb.id
+}
+
+module "ecs" {
+  source = "./modules/ecs"
+
+  project_name          = var.project_name
+  private_subnet_ids    = module.vpc.private_subnet_ids
+  ecs_security_group_id = aws_security_group.ecs.id
+
+  backend_image  = var.backend_image
+  frontend_image = var.frontend_image
+
+  database_url = var.database_url
+  secret_key   = var.secret_key
+  algorithm    = var.algorithm
+
+  backend_target_group_arn  = module.alb.backend_target_group_arn
+  frontend_target_group_arn = module.alb.frontend_target_group_arn
 }

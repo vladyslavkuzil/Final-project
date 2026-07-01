@@ -1,13 +1,28 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { Hov, Logo } from "../../components/infoboard/ui";
 import { NewProjectModal } from "../../components/infoboard/modals";
 import { useStore } from "../../lib/store";
+import { clearAuth, getToken } from "../../lib/api";
 
 export default function ProjectsHome() {
   const router = useRouter();
-  const { me, projects, createProject } = useStore();
+  const { me, projects, createProject, refresh } = useStore();
   const [showNew, setShowNew] = useState(false);
+
+  useEffect(() => {
+    if (!getToken()) {
+      router.replace("/login");
+      return;
+    }
+    refresh().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router]);
+
+  const logout = () => {
+    clearAuth();
+    router.push("/login");
+  };
 
   return (
     <div style={{ minHeight: "100vh", background: "#f7f7f5" }}>
@@ -30,7 +45,7 @@ export default function ProjectsHome() {
           <span style={{ fontSize: 13, color: "#8b8a83" }}>{me}</span>
           <Hov
             as="button"
-            onClick={() => router.push("/login")}
+            onClick={logout}
             style={{
               fontSize: 13,
               color: "#5c5b57",
@@ -207,7 +222,7 @@ export default function ProjectsHome() {
                     paddingTop: 12,
                   }}
                 >
-                  <span>{p.files.length} files</span>
+                  <span>{p.filesCount} files</span>
                   <span style={{ color: "#d8d7d1" }}>·</span>
                   <span>{p.size}</span>
                   <span style={{ color: "#d8d7d1" }}>·</span>
@@ -244,10 +259,7 @@ export default function ProjectsHome() {
       {showNew && (
         <NewProjectModal
           onClose={() => setShowNew(false)}
-          onCreate={(name, desc) => {
-            createProject(name, desc);
-            setShowNew(false);
-          }}
+          onCreate={(name, desc) => createProject(name, desc)}
         />
       )}
     </div>

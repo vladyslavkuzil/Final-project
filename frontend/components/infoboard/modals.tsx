@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import type { Project } from "../../lib/store";
-import { FOCUS_RING, Hov, INPUT_STYLE, LABEL_STYLE, Modal } from "./ui";
+import { ERROR_STYLE, FOCUS_RING, Hov, INPUT_STYLE, LABEL_STYLE, Modal } from "./ui";
 
 const CANCEL_STYLE: React.CSSProperties = {
   fontSize: 13,
@@ -30,20 +30,50 @@ const FOOTER_STYLE: React.CSSProperties = {
   gap: 10,
 };
 
+// Shared submit lifecycle for the modals: tracks busy/error, runs the action,
+// closes on success, and surfaces the error message on failure.
+function useModalSubmit(
+  action: () => Promise<void> | void,
+  onClose: () => void,
+  fallback: string
+) {
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await action();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : fallback);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return { error, busy, submit };
+}
+
 export function NewProjectModal({
   onClose,
   onCreate,
 }: {
   onClose: () => void;
-  onCreate: (name: string, desc: string) => void;
+  onCreate: (name: string, desc: string) => void | Promise<void>;
 }) {
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
+  const { error, busy, submit } = useModalSubmit(
+    () => onCreate(name.trim(), desc.trim()),
+    onClose,
+    "Failed to create project"
+  );
 
   const create = () => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    onCreate(trimmed, desc.trim());
+    if (!name.trim()) return;
+    submit();
   };
 
   return (
@@ -69,15 +99,16 @@ export function NewProjectModal({
         onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDesc(e.target.value)}
         placeholder="What is this project about?"
         rows={3}
-        style={{ ...INPUT_STYLE, resize: "vertical", marginBottom: 22 }}
+        style={{ ...INPUT_STYLE, resize: "vertical", marginBottom: error ? 12 : 22 }}
         focusStyle={FOCUS_RING}
       />
+      {error && <p style={ERROR_STYLE}>{error}</p>}
       <div style={FOOTER_STYLE}>
         <Hov as="button" onClick={onClose} style={CANCEL_STYLE} hoverStyle={{ background: "#f4f4f2" }}>
           Cancel
         </Hov>
-        <Hov as="button" onClick={create} style={CONFIRM_STYLE} hoverStyle={{ background: "#2560d8" }}>
-          Create
+        <Hov as="button" onClick={create} disabled={busy} style={CONFIRM_STYLE} hoverStyle={{ background: "#2560d8" }}>
+          {busy ? "Creating…" : "Create"}
         </Hov>
       </div>
     </Modal>
@@ -89,37 +120,43 @@ export function InviteModal({
   onSend,
 }: {
   onClose: () => void;
-  onSend: (userId: string) => void;
+  onSend: (email: string) => void | Promise<void>;
 }) {
-  const [inviteId, setInviteId] = useState("");
+  const [email, setEmail] = useState("");
+  const { error, busy, submit } = useModalSubmit(
+    () => onSend(email.trim()),
+    onClose,
+    "Failed to send invite"
+  );
 
   const send = () => {
-    const id = inviteId.trim();
-    if (id) onSend(id);
-    else onClose();
+    if (!email.trim()) return;
+    submit();
   };
 
   return (
     <Modal maxWidth={420} onClose={onClose}>
       <h2 style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 600, letterSpacing: "-.3px" }}>Invite User</h2>
       <p style={{ margin: "0 0 18px", fontSize: 13, color: "#8b8a83" }}>
-        Enter the User ID of the person to invite.
+        Enter the email of the person to invite.
       </p>
-      <label style={LABEL_STYLE}>User ID</label>
+      <label style={LABEL_STYLE}>Email</label>
       <Hov
         as="input"
-        value={inviteId}
-        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInviteId(e.target.value)}
-        placeholder="e.g. user_8f3a2c"
-        style={{ ...INPUT_STYLE, marginBottom: 22 }}
+        type="email"
+        value={email}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+        placeholder="you@example.com"
+        style={{ ...INPUT_STYLE, marginBottom: error ? 12 : 22 }}
         focusStyle={FOCUS_RING}
       />
+      {error && <p style={ERROR_STYLE}>{error}</p>}
       <div style={FOOTER_STYLE}>
         <Hov as="button" onClick={onClose} style={CANCEL_STYLE} hoverStyle={{ background: "#f4f4f2" }}>
           Cancel
         </Hov>
-        <Hov as="button" onClick={send} style={CONFIRM_STYLE} hoverStyle={{ background: "#2560d8" }}>
-          Send Invite
+        <Hov as="button" onClick={send} disabled={busy} style={CONFIRM_STYLE} hoverStyle={{ background: "#2560d8" }}>
+          {busy ? "Sending…" : "Send Invite"}
         </Hov>
       </div>
     </Modal>
@@ -133,11 +170,16 @@ export function SettingsModal({
 }: {
   project: Project;
   onClose: () => void;
-  onSave: (patch: { name: string; desc: string; finished: boolean }) => void;
+  onSave: (patch: { name: string; desc: string; finished: boolean }) => void | Promise<void>;
 }) {
   const [name, setName] = useState(project.name);
   const [desc, setDesc] = useState(project.desc);
   const [finished, setFinished] = useState(project.finished);
+  const { error, busy, submit } = useModalSubmit(
+    () => onSave({ name, desc, finished }),
+    onClose,
+    "Failed to save settings"
+  );
 
   return (
     <Modal maxWidth={440} onClose={onClose}>
@@ -205,17 +247,19 @@ export function SettingsModal({
           />
         </button>
       </div>
+      {error && <p style={ERROR_STYLE}>{error}</p>}
       <div style={FOOTER_STYLE}>
         <Hov as="button" onClick={onClose} style={CANCEL_STYLE} hoverStyle={{ background: "#f4f4f2" }}>
           Cancel
         </Hov>
         <Hov
           as="button"
-          onClick={() => onSave({ name, desc, finished })}
+          onClick={submit}
+          disabled={busy}
           style={CONFIRM_STYLE}
           hoverStyle={{ background: "#2560d8" }}
         >
-          Save
+          {busy ? "Saving…" : "Save"}
         </Hov>
       </div>
     </Modal>

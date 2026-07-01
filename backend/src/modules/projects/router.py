@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from src.core.database import get_db
 from src.core.security import get_current_user
-from src.core.dependencies import require_role
+from src.core.dependencies import AccessContext, require_role
 from src.core.enums import MembershipRole
 from src.modules.projects import services, schemas
 from src.modules.projects.exceptions import (
@@ -10,6 +10,7 @@ from src.modules.projects.exceptions import (
     ProjectAlreadyExistsError,
     ProjectNotFoundError,
     UserNotFoundError,
+    OwnerCannotLeaveError,
 )
 
 router = APIRouter()
@@ -62,7 +63,7 @@ def list_projects(
 def retrieve_project_id(
     project_id: str,
     db: Session = Depends(get_db),
-    access_context=Depends(require_role()),
+    access: AccessContext = Depends(require_role()),
 ):
     project = services.get_project_by_id(db, project_id)
 
@@ -70,7 +71,7 @@ def retrieve_project_id(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Project not found."
         )
-    project.user_role = access_context.role
+    project["user_role"] = access.role
 
     return project
 
@@ -143,6 +144,29 @@ def delete_project(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
+        )
+
+
+@router.post(
+    "/project/{project_id}/leave",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def leave_project(
+    project_id: str,
+    db: Session = Depends(get_db),
+    access: AccessContext = Depends(require_role()),
+):
+    try:
+        services.leave_project(db, project_id, access.user_id)
+    except ProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
+    except OwnerCannotLeaveError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Project owner cannot leave their own project",
         )
 
 

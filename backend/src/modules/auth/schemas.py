@@ -6,13 +6,20 @@ class UserCreate(BaseModel):
     password: str
 
 
-class UserResponse(BaseModel):
+class PublicUser(BaseModel):
+    """Minimal public projection of a user (no status/credential fields).
+
+    Used by the invite lookup so an authenticated caller can resolve an email
+    to an id without leaking account state such as ``is_active``.
+    """
+
     id: str
     email: EmailStr
-    is_active: bool
+    model_config = {"from_attributes": True}
 
-    class Config:
-        from_attributes = True
+
+class UserResponse(PublicUser):
+    is_active: bool
 
 
 class Token(BaseModel):
