@@ -1,0 +1,99 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors / IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Secrets and local env files
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pytype/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+dist/
+build/
+site/
+pip-wheel-metadata/
+*.egg-info/
+
+# Python packaging / lock files that are usually local-only
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Test / lint caches
+.hypothesis/
+
+# FastAPI / Uvicorn
+*.log
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+terraform.exe
+
+# Frontend / Node
+frontend/node_modules/
+node_modules/
+frontend/dist/
+frontend/build/
+frontend/.vite/
+frontend/.next/
+.pnpm-store/
+.npm/
+.yarn/
+.yarn-cache/
+.parcel-cache/
+*.tsbuildinfo
+
+# Docker
+.docker/
+docker-data/
+postgres_data/
+*.pid
+
+# Terraform / IaC
+infra/.terraform/
+infra/.terraform.lock.hcl
+infra/*.tfstate
+infra/*.tfstate.*
+infra/crash.log
+infra/*.tfvars
+infra/*.tfvars.json
+**/.terraform.lock.hcl
+
+# AWS / serverless build artifacts
+.aws-sam/
+.serverless/
+lambda/**/__pycache__/
+lambda/**/.pytest_cache/
+lambda/**/build/
+lambda/**/dist/
+
+# Migrations / generated files that should stay tracked only if explicitly added
+# (keep alembic/versions committed; ignore runtime artifacts only)
+alembic/*.pyc
