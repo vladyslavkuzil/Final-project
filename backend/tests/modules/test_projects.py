@@ -12,7 +12,6 @@ from src.modules.project_membership.models import ProjectMembership
 from src.modules.projects import services
 from src.modules.projects.models import Project
 from src.modules.projects.exceptions import (
-    AccessDeniedError,
     ProjectAlreadyExistsError,
     ProjectNotFoundError,
     UserNotFoundError,
