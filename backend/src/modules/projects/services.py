@@ -184,7 +184,7 @@ def update_project(
         The updated and refreshed Project from the database.
 
     Raises:
-        ProjectNotFoundError: If the project is not found or user is not the owner.
+        ProjectNotFoundError: If the project is not found.
         ProjectAlreadyExistsError: If the new name is already in use.
     """
     project = get_project_by_id(db, project_id)
@@ -236,7 +236,7 @@ def delete_project(db: Session, project_id: str) -> dict:
         A dict with a confirmation message.
 
     Raises:
-        ProjectNotFoundError: If the project is not found or user is not the owner.
+        ProjectNotFoundError: If the project is not found.
     """
     project = get_project_by_id(db, project_id)
     if project is None:
