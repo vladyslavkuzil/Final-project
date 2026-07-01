@@ -11,6 +11,7 @@ from src.modules.project_membership.exceptions import (
     AlreadyMemberError,
     MemberNotFoundError,
     UserNotFoundError,
+    SelfRemovalError,
 )
 
 
@@ -114,10 +115,17 @@ async def remove_user(
     project_id: str,
     user_id: str,
     db: Session = Depends(get_db),
-    _: AccessContext = Depends(require_role(MembershipRole.OWNER)),
+    access: AccessContext = Depends(require_role(MembershipRole.OWNER)),
 ):
     try:
-        return services.remove_user(db=db, project_id=project_id, user_id=user_id)
+        return services.remove_user(
+            db=db, project_id=project_id, user_id=user_id, caller_id=access.user_id
+        )
+    except SelfRemovalError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot remove yourself from the project",
+        )
     except UserNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

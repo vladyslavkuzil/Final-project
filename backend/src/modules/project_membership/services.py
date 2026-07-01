@@ -1,7 +1,9 @@
 from datetime import datetime, timezone
 
 import secrets
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from src.core.cache import redis_client
 from src.core.enums import MembershipRole
 from src.modules.auth.models import User
 from src.modules.project_membership.exceptions import (
@@ -9,6 +11,7 @@ from src.modules.project_membership.exceptions import (
     AlreadyMemberError,
     UserNotFoundError,
     MemberNotFoundError,
+    SelfRemovalError,
 )
 from src.modules.project_membership.models import ProjectMembership, JoinCode
 
@@ -129,6 +132,7 @@ def join_project(db: Session, code: str, user_id: str):
 
     Raises InvalidJoinCodeError if the code does not exist or has expired.
     Raises AlreadyMemberError if the user is already a member of the project.
+    Invalidates the user's project list cache on success.
     Returns a dict with the joined project_id on success.
     """
     join_code = db.query(JoinCode).filter(JoinCode.code == code).one_or_none()
@@ -146,7 +150,12 @@ def join_project(db: Session, code: str, user_id: str):
     try:
         _add_user(db=db, project_id=project_id, user_id=user_id)
         db.commit()
+        redis_client.delete(f"user:{user_id}:projects")
+        redis_client.delete(f"user:{user_id}:project:{project_id}")
         return {"project_id": project_id}
+    except IntegrityError:
+        db.rollback()
+        raise AlreadyMemberError
     except Exception:
         db.rollback()
         raise
@@ -157,13 +166,19 @@ def invite_user_by_email(db: Session, project_id: str, email: str):
 
     Raises UserNotFoundError if no account with the given email exists.
     Raises AlreadyMemberError if the user is already a member of the project.
+    Invalidates the invited user's project list cache on success.
     Returns a confirmation dict on success.
     """
     user = _get_user_or_raise(db=db, email=email)
     try:
         _add_user(db=db, project_id=project_id, user_id=user.id)
         db.commit()
+        redis_client.delete(f"user:{user.id}:projects")
+        redis_client.delete(f"user:{user.id}:project:{project_id}")
         return {"message": "User invited successfully"}
+    except IntegrityError:
+        db.rollback()
+        raise AlreadyMemberError
     except Exception:
         db.rollback()
         raise
@@ -183,13 +198,17 @@ def get_users(db: Session, project_id: str):
     return {"users": users}
 
 
-def remove_user(db: Session, project_id: str, user_id: str):
+def remove_user(db: Session, project_id: str, user_id: str, caller_id: str):
     """Remove a user from a project.
 
+    Raises SelfRemovalError if the caller attempts to remove themselves.
     Raises UserNotFoundError if no account with the given user_id exists.
     Raises MemberNotFoundError if the user is not a member of the project.
     Returns a confirmation dict on success.
     """
+    if caller_id == user_id:
+        raise SelfRemovalError
+
     _get_user_or_raise(db=db, user_id=user_id)
     user_membership = (
         db.query(ProjectMembership)

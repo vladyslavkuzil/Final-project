@@ -25,3 +25,8 @@ class UserNotFoundError(ProjectMembershipError):
 class MemberNotFoundError(ProjectMembershipError):
     def __init__(self, msg: str = "User is not a member of this project"):
         super().__init__(msg)
+
+
+class SelfRemovalError(ProjectMembershipError):
+    def __init__(self, msg: str = "Cannot remove yourself from the project"):
+        super().__init__(msg)

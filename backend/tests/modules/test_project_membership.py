@@ -1,12 +1,14 @@
 import unittest
 from datetime import datetime, timezone, timedelta
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
+from sqlalchemy.exc import IntegrityError
 
 from src.modules.project_membership import services
 from src.modules.project_membership.exceptions import (
     AlreadyMemberError,
     InvalidJoinCodeError,
     MemberNotFoundError,
+    SelfRemovalError,
     UserNotFoundError,
 )
 from src.modules.project_membership.models import JoinCode, ProjectMembership
@@ -298,14 +300,16 @@ class TestJoinProject(unittest.TestCase):
     def test_returns_project_id_on_success(self):
         valid_code = make_join_code(project_id="proj-42")
         db = sequential_db([valid_code, None])
-        result = services.join_project(db, "ABCD1234", "user-1")
+        with patch("src.modules.project_membership.services.redis_client"):
+            result = services.join_project(db, "ABCD1234", "user-1")
         self.assertEqual(result, {"project_id": "proj-42"})
         db.commit.assert_called_once()
 
     def test_code_without_expiry_is_always_valid(self):
         valid_code = make_join_code(project_id="proj-1", expires_at=None)
         db = sequential_db([valid_code, None])
-        result = services.join_project(db, "ABCD1234", "user-1")
+        with patch("src.modules.project_membership.services.redis_client"):
+            result = services.join_project(db, "ABCD1234", "user-1")
         self.assertIn("project_id", result)
 
     def test_future_expiry_is_valid(self):
@@ -314,8 +318,17 @@ class TestJoinProject(unittest.TestCase):
             expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
         )
         db = sequential_db([future_code, None])
-        result = services.join_project(db, "ABCD1234", "user-1")
+        with patch("src.modules.project_membership.services.redis_client"):
+            result = services.join_project(db, "ABCD1234", "user-1")
         self.assertEqual(result["project_id"], "proj-1")
+
+    def test_raises_already_member_on_integrity_error(self):
+        valid_code = make_join_code(project_id="proj-1")
+        db = sequential_db([valid_code, None])
+        db.commit.side_effect = IntegrityError(None, None, Exception("unique"))
+        with self.assertRaises(AlreadyMemberError):
+            services.join_project(db, "ABCD1234", "user-1")
+        db.rollback.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -339,7 +352,8 @@ class TestInviteUserByEmail(unittest.TestCase):
     def test_returns_success_message_on_invite(self):
         user = make_user()
         db = sequential_db([user, None])
-        result = services.invite_user_by_email(db, "proj-1", "user@test.com")
+        with patch("src.modules.project_membership.services.redis_client"):
+            result = services.invite_user_by_email(db, "proj-1", "user@test.com")
         self.assertEqual(result, {"message": "User invited successfully"})
         db.commit.assert_called_once()
 
@@ -348,6 +362,14 @@ class TestInviteUserByEmail(unittest.TestCase):
         db = sequential_db([user, None])
         db.commit.side_effect = Exception("db error")
         with self.assertRaises(Exception):
+            services.invite_user_by_email(db, "proj-1", "user@test.com")
+        db.rollback.assert_called_once()
+
+    def test_raises_already_member_on_integrity_error(self):
+        user = make_user()
+        db = sequential_db([user, None])
+        db.commit.side_effect = IntegrityError(None, None, Exception("unique"))
+        with self.assertRaises(AlreadyMemberError):
             services.invite_user_by_email(db, "proj-1", "user@test.com")
         db.rollback.assert_called_once()
 
@@ -385,22 +407,28 @@ class TestGetUsers(unittest.TestCase):
 
 
 class TestRemoveUser(unittest.TestCase):
+    def test_raises_self_removal_error_when_caller_removes_themselves(self):
+        db = Mock()
+        with self.assertRaises(SelfRemovalError):
+            services.remove_user(db, "proj-1", "user-1", caller_id="user-1")
+        db.query.assert_not_called()
+
     def test_raises_user_not_found_when_user_does_not_exist(self):
         db = sequential_db([None])
         with self.assertRaises(UserNotFoundError):
-            services.remove_user(db, "proj-1", "missing-user")
+            services.remove_user(db, "proj-1", "missing-user", caller_id="owner-1")
 
     def test_raises_member_not_found_when_not_in_project(self):
         user = make_user()
         db = sequential_db([user, None])
         with self.assertRaises(MemberNotFoundError):
-            services.remove_user(db, "proj-1", "user-1")
+            services.remove_user(db, "proj-1", "user-1", caller_id="owner-1")
 
     def test_deletes_membership_and_returns_message(self):
         user = make_user()
         membership = make_membership()
         db = sequential_db([user, membership])
-        result = services.remove_user(db, "proj-1", "user-1")
+        result = services.remove_user(db, "proj-1", "user-1", caller_id="owner-1")
         db.delete.assert_called_once_with(membership)
         db.commit.assert_called_once()
         self.assertEqual(result, {"message": "User removed from project"})
@@ -411,5 +439,5 @@ class TestRemoveUser(unittest.TestCase):
         db = sequential_db([user, membership])
         db.commit.side_effect = Exception("db error")
         with self.assertRaises(Exception):
-            services.remove_user(db, "proj-1", "user-1")
+            services.remove_user(db, "proj-1", "user-1", caller_id="owner-1")
         db.rollback.assert_called_once()

@@ -1,10 +1,9 @@
-from datetime import datetime
-from pydantic import BaseModel, EmailStr
+from pydantic import AwareDatetime, BaseModel, EmailStr
 from src.modules.auth.schemas import UserResponse
 
 
 class JoinCodeCreateRequest(BaseModel):
-    expires_at: datetime | None = None
+    expires_at: AwareDatetime | None = None
 
 
 class JoinCodeResponse(BaseModel):

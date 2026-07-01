@@ -35,6 +35,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["project_id"], ["projects.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("code"),
+        sa.UniqueConstraint("project_id"),
     )
     # ### end Alembic commands ###
 
