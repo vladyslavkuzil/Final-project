@@ -6,6 +6,7 @@ from src.core.dependencies import require_role
 from src.core.enums import MembershipRole
 from src.modules.projects import services, schemas
 from src.modules.projects.exceptions import (
+    AccessDeniedError,
     ProjectAlreadyExistsError,
     ProjectNotFoundError,
     UserNotFoundError,
@@ -61,7 +62,7 @@ def list_projects(
 def retrieve_project_id(
     project_id: str,
     db: Session = Depends(get_db),
-    user_role: MembershipRole = Depends(require_role()),
+    access_context=Depends(require_role()),
 ):
     project = services.get_project_by_id(db, project_id)
 
@@ -69,7 +70,7 @@ def retrieve_project_id(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Project not found."
         )
-    project.user_role = user_role
+    project.user_role = access_context.role
 
     return project
 
@@ -81,13 +82,18 @@ def retrieve_project_id(
 def retrieve_project_name(
     project_name: str,
     db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
 ):
-    project = services.get_project_by_name(db, project_name)
-
-    if project is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Project not found."
+    try:
+        project, _ = services.get_project_by_name_for_member(
+            db, project_name, current_user
         )
+    except ProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
+    except AccessDeniedError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
 
     return project
 
@@ -100,13 +106,12 @@ def update_project(
     project_id: str,
     payload: schemas.ProjectUpdate,
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    _: object = Depends(require_role(MembershipRole.OWNER)),
 ):
     try:
         return services.update_project(
             db=db,
             project_id=project_id,
-            user_id=current_user,
             name=payload.name,
             description=payload.description,
             is_finished=payload.is_finished,
@@ -127,13 +132,12 @@ def update_project(
 def delete_project(
     project_id: str,
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    _: object = Depends(require_role(MembershipRole.OWNER)),
 ):
     try:
         return services.delete_project(
             db=db,
             project_id=project_id,
-            user_id=current_user,
         )
     except ProjectNotFoundError as exc:
         raise HTTPException(

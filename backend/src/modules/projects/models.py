@@ -9,19 +9,10 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     ForeignKey,
-    Table,
-    Column,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.core.base import Base
 from src.modules.auth.models import User
-
-project_users = Table(
-    "project_users",
-    Base.metadata,
-    Column("project_id", ForeignKey("projects.id"), primary_key=True),
-    Column("user_id", ForeignKey("users.id"), primary_key=True),
-)
 
 
 class Project(Base):
@@ -44,7 +35,4 @@ class Project(Base):
     )
     is_finished: Mapped[bool] = mapped_column(Boolean, default=False)
     admin_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
-    admin: Mapped["User"] = relationship(foreign_keys=[admin_id], overlaps="users")
-    users: Mapped[list["User"]] = relationship(
-        secondary=project_users, overlaps="admin"
-    )
+    admin: Mapped["User"] = relationship(foreign_keys=[admin_id])

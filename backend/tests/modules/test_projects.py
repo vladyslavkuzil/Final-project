@@ -4,6 +4,7 @@ from datetime import datetime
 from src.core.enums import MembershipRole
 from src.modules.projects import services
 from src.modules.projects.exceptions import (
+    AccessDeniedError,
     ProjectAlreadyExistsError,
     ProjectNotFoundError,
     UserNotFoundError,
@@ -122,11 +123,12 @@ class ProjectServiceUnitTests(unittest.TestCase):
             with self.assertRaises(ProjectAlreadyExistsError):
                 services.create_project(self.db, "project-1", "admin-id")
 
-    def test_create_project_raises_when_user_not_found(self):
-        self.db.query.return_value = make_query(None)
+    def test_create_project_does_not_require_user_lookup(self):
         with patch.object(services, "get_project_by_name", return_value=None):
-            with self.assertRaises(UserNotFoundError):
-                services.create_project(self.db, "project-1", "missing-admin")
+            project = services.create_project(self.db, "project-1", "admin-id")
+
+        self.assertEqual(project.name, "project-1")
+        self.assertEqual(project.user_role, MembershipRole.OWNER)
 
     def test_create_project_commits_and_returns_project(self):
         user = make_user()
@@ -145,37 +147,31 @@ class ProjectServiceUnitTests(unittest.TestCase):
         self.assertEqual(project.user_role, MembershipRole.OWNER)
         self.db.commit.assert_called_once()
         self.db.refresh.assert_called_once_with(project)
-        self.assertIn(user, project.users)
 
     def test_update_project_raises_when_not_found(self):
-        with patch.object(services, "get_project_by_id_admin", return_value=None):
+        with patch.object(services, "get_project_by_id", return_value=None):
             with self.assertRaises(ProjectNotFoundError):
-                services.update_project(self.db, "missing-id", "admin-id", name="x")
+                services.update_project(self.db, "missing-id", name="x")
 
     def test_update_project_raises_when_duplicate_name(self):
         project = SimpleProject()
         other_project = SimpleProject(project_id="proj-2", name="existing-name")
         with (
-            patch.object(services, "get_project_by_id_admin", return_value=project),
-            patch.object(
-                services, "get_project_by_name_admin", return_value=other_project
-            ),
+            patch.object(services, "get_project_by_id", return_value=project),
+            patch.object(services, "get_project_by_name", return_value=other_project),
         ):
             with self.assertRaises(ProjectAlreadyExistsError):
-                services.update_project(
-                    self.db, project.id, "admin-id", name="existing-name"
-                )
+                services.update_project(self.db, project.id, name="existing-name")
 
     def test_update_project_changes_fields(self):
         project = SimpleProject()
         with (
-            patch.object(services, "get_project_by_id_admin", return_value=project),
-            patch.object(services, "get_project_by_name_admin", return_value=None),
+            patch.object(services, "get_project_by_id", return_value=project),
+            patch.object(services, "get_project_by_name", return_value=None),
         ):
             updated = services.update_project(
                 self.db,
                 project.id,
-                "admin-id",
                 name="project-2",
                 description="updated",
                 is_finished=True,
@@ -187,46 +183,40 @@ class ProjectServiceUnitTests(unittest.TestCase):
         self.db.commit.assert_called_once()
 
     def test_delete_project_raises_when_not_found(self):
-        with patch.object(services, "get_project_by_id_admin", return_value=None):
+        with patch.object(services, "get_project_by_id", return_value=None):
             with self.assertRaises(ProjectNotFoundError):
-                services.delete_project(self.db, "missing-id", "admin-id")
+                services.delete_project(self.db, "missing-id")
 
     def test_delete_project_commits_and_returns_message(self):
         project = SimpleProject()
-        with patch.object(services, "get_project_by_id_admin", return_value=project):
-            result = services.delete_project(self.db, project.id, "admin-id")
+        with patch.object(services, "get_project_by_id", return_value=project):
+            result = services.delete_project(self.db, project.id)
 
         self.db.delete.assert_called_once_with(project)
         self.db.commit.assert_called_once()
         self.assertEqual(result, {"message": "Project deleted successfully"})
 
     def test_add_user_to_project_raises_when_project_missing(self):
-        with patch.object(services, "get_project_by_id_admin", return_value=None):
+        with patch.object(services, "get_project_by_id", return_value=None):
             with self.assertRaises(ProjectNotFoundError):
-                services.add_user_to_project(
-                    self.db, "user-2", "missing-id", "admin-id"
-                )
+                services.add_user_to_project(self.db, "user-2", "missing-id")
 
     def test_add_user_to_project_raises_when_user_missing(self):
         project = SimpleProject()
         self.db.query.return_value = make_query(None)
-        with patch.object(services, "get_project_by_id_admin", return_value=project):
+        with patch.object(services, "get_project_by_id", return_value=project):
             with self.assertRaises(UserNotFoundError):
-                services.add_user_to_project(
-                    self.db, "missing-user", project.id, "admin-id"
-                )
+                services.add_user_to_project(self.db, "missing-user", project.id)
 
     def test_add_user_to_project_appends_user(self):
         project = SimpleProject()
         user = make_user(user_id="user-2")
         self.db.query.return_value = make_query(user)
-        with patch.object(services, "get_project_by_id_admin", return_value=project):
-            updated = services.add_user_to_project(
-                self.db, "user-2", project.id, "admin-id"
-            )
+        with patch.object(services, "get_project_by_id", return_value=project):
+            updated = services.add_user_to_project(self.db, "user-2", project.id)
 
         self.db.commit.assert_called_once()
-        self.assertIn(user, updated.users)
+        self.assertEqual(updated.id, project.id)
 
 
 if __name__ == "__main__":
