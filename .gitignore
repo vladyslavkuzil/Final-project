@@ -84,6 +84,7 @@ infra/*.tfstate.*
 infra/crash.log
 infra/*.tfvars
 infra/*.tfvars.json
+**/.terraform.lock.hcl
 
 # AWS / serverless build artifacts
 .aws-sam/
@@ -96,4 +97,3 @@ lambda/**/dist/
 # Migrations / generated files that should stay tracked only if explicitly added
 # (keep alembic/versions committed; ignore runtime artifacts only)
 alembic/*.pyc
-

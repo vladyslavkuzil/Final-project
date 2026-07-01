@@ -1,15 +1,34 @@
 import jwt
 from fastapi import APIRouter, Depends, status, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import EmailStr
 from sqlalchemy.orm import Session
 from src.core.database import get_db
-from .schemas import UserCreate, UserResponse, Token, RefreshRequest
-from .services import register_user, authenticate_user
+from src.core.security import get_current_user
+from .schemas import UserCreate, UserResponse, PublicUser, Token, RefreshRequest
+from .services import register_user, authenticate_user, get_user_by_email
 from .security import create_access_token, create_refresh_token
 from src.core.config import SECRET_KEY, ALGORITHM
 from .models import User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+users_router = APIRouter(prefix="/users", tags=["users"])
+
+
+@users_router.get("", response_model=PublicUser)
+def find_user_by_email(
+    email: EmailStr,
+    db: Session = Depends(get_db),
+    _: str = Depends(get_current_user),
+):
+    """Look up a single user by email (used by the project invite flow)."""
+    user = get_user_by_email(db, email)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+    return user
 
 
 @router.post("/register", response_model=UserResponse)

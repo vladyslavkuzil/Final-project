@@ -1,5 +1,8 @@
+import uuid
+from pathlib import Path
+
 import pytest
-from unittest.mock import patch
+from unittest.mock import Mock, call, patch
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -10,6 +13,49 @@ from src.modules.projects.models import Project
 
 NONEXISTENT_PROJECT_ID = "does-not-exist-project"
 NONEXISTENT_DOCUMENT_ID = "does-not-exist-xyz"
+
+
+def _upload(client, project_id, *, title="Doc", filename="file.pdf", content=b"data"):
+    """POST a multipart document upload, matching the real client contract."""
+    return client.post(
+        f"/project/{project_id}/documents",
+        data={"title": title},
+        files={"file": (filename, content, "application/octet-stream")},
+    )
+
+
+class InMemoryStorage:
+    """Test double for StorageBackend that keeps file bytes in memory."""
+
+    def __init__(self):
+        self.files: dict[str, bytes] = {}
+
+    async def save(self, file):
+        stored = f"{uuid.uuid4().hex}{Path(file.filename or '').suffix}"
+        self.files[stored] = await file.read()
+        return stored
+
+    async def get(self, path):
+        if path not in self.files:
+            raise FileNotFoundError(path)
+        yield self.files[path]
+
+    def exists(self, path):
+        return path in self.files
+
+    def delete(self, path):
+        self.files.pop(path, None)
+
+
+@pytest.fixture(autouse=True)
+def storage_override():
+    from src.main import app
+    from src.core.storage import get_storage
+
+    storage = InMemoryStorage()
+    app.dependency_overrides[get_storage] = lambda: storage
+    yield storage
+    app.dependency_overrides.pop(get_storage, None)
 
 
 @pytest.fixture(autouse=True)
@@ -76,10 +122,7 @@ def no_access_user(db: Session) -> User:
 
 @pytest.fixture
 def created_doc(client: TestClient, db: Session, seeded_project: Project) -> dict:
-    r = client.post(
-        f"/project/{seeded_project.id}/documents",
-        json={"title": "Fixture Doc", "file_path": "/f/fixture.pdf"},
-    )
+    r = _upload(client, seeded_project.id, title="Fixture Doc", filename="fixture.pdf")
     assert r.status_code == 201
     return r.json()
 
@@ -127,11 +170,8 @@ def test_list_documents_with_existing_doc_returns_200(
 def test_create_document_valid_payload_returns_201(
     client: TestClient, db: Session, seeded_project: Project
 ):
-    # Arrange
-    payload = {"title": "New Doc", "file_path": "/f/new.pdf"}
-
     # Act
-    response = client.post(f"/project/{seeded_project.id}/documents", json=payload)
+    response = _upload(client, seeded_project.id, title="New Doc", filename="new.pdf")
 
     # Assert
     assert response.status_code == 201
@@ -142,17 +182,16 @@ def test_create_document_valid_payload_returns_201(
     assert all(k in data for k in ("id", "created_at", "updated_at"))
 
 
-def test_create_document_disallowed_extension_returns_422(
+def test_create_document_disallowed_extension_returns_400(
     client: TestClient, seeded_project: Project
 ):
-    # Arrange
-    payload = {"title": "Bad File", "file_path": "/f/malware.exe"}
-
     # Act
-    response = client.post(f"/project/{seeded_project.id}/documents", json=payload)
+    response = _upload(
+        client, seeded_project.id, title="Bad File", filename="malware.exe"
+    )
 
     # Assert
-    assert response.status_code == 422
+    assert response.status_code == 400
 
 
 # ---------------------------------------------------------------------------
@@ -160,36 +199,42 @@ def test_create_document_disallowed_extension_returns_422(
 # ---------------------------------------------------------------------------
 
 
-def test_download_document_existing_id_returns_200(
-    client: TestClient, created_doc: dict, seeded_project: Project
-):
-    # Arrange — document seeded via fixture
-
-    # Act
-    response = client.get(f"/project/{seeded_project.id}/documents/{created_doc['id']}")
-
-    # Assert
-    assert response.status_code == 200
-    assert b"MOCK FILE CONTENT" in response.content
-
-
-def test_download_document_content_disposition_exposes_only_basename(
+def test_download_document_existing_id_returns_real_bytes(
     client: TestClient, db: Session, seeded_project: Project
 ):
-    # Arrange — file_path contains a deep internal path
-    r = client.post(
-        f"/project/{seeded_project.id}/documents",
-        json={"title": "Path Doc", "file_path": "/internal/secrets/report.pdf"},
+    # Arrange — upload a document with known content
+    r = _upload(
+        client,
+        seeded_project.id,
+        title="Report",
+        filename="report.pdf",
+        content=b"hello world pdf",
     )
     doc_id = r.json()["id"]
 
     # Act
     response = client.get(f"/project/{seeded_project.id}/documents/{doc_id}")
 
-    # Assert — header must contain only the filename, not the full path
+    # Assert — the real stored bytes are streamed back
+    assert response.status_code == 200
+    assert response.content == b"hello world pdf"
+
+
+def test_download_document_disposition_uses_title_not_stored_path(
+    client: TestClient, db: Session, seeded_project: Project
+):
+    # Arrange — the stored path is an opaque key; the title drives the filename
+    r = _upload(client, seeded_project.id, title="report.pdf", filename="report.pdf")
+    doc_id = r.json()["id"]
+    stored_path = r.json()["file_path"]
+
+    # Act
+    response = client.get(f"/project/{seeded_project.id}/documents/{doc_id}")
+
+    # Assert — header exposes the title-based filename, never the stored key
     disposition = response.headers["content-disposition"]
     assert "report.pdf" in disposition
-    assert "/internal/secrets/" not in disposition
+    assert stored_path not in disposition
 
 
 def test_download_document_nonexistent_id_returns_404(
@@ -202,6 +247,21 @@ def test_download_document_nonexistent_id_returns_404(
     response = client.get(f"/project/{seeded_project.id}/documents/{doc_id}")
 
     # Assert
+    assert response.status_code == 404
+
+
+def test_download_document_missing_file_returns_404(
+    client: TestClient, seeded_project: Project, storage_override
+):
+    # Arrange — a document whose stored file has gone missing (e.g. volume reset)
+    r = _upload(client, seeded_project.id, title="Gone", filename="gone.pdf")
+    doc_id = r.json()["id"]
+    storage_override.delete(r.json()["file_path"])
+
+    # Act
+    response = client.get(f"/project/{seeded_project.id}/documents/{doc_id}")
+
+    # Assert — a clean 404, not a broken 200 stream
     assert response.status_code == 404
 
 
@@ -295,6 +355,47 @@ def test_delete_document_nonexistent_id_returns_404(
     assert response.status_code == 404
 
 
+def test_delete_document_unlinks_file_only_after_commit():
+    # Arrange — the stored file must be removed strictly after the DB commit.
+    from src.modules.documents import services
+
+    db = Mock()
+    storage = Mock()
+    doc = Mock()
+    doc.file_path = "stored.pdf"
+    # Record commit and delete on a shared parent so their relative order is visible.
+    manager = Mock()
+    manager.attach_mock(db.commit, "commit")
+    manager.attach_mock(storage.delete, "storage_delete")
+
+    # Act
+    with patch.object(services, "get_document", return_value=doc):
+        result = services.delete_document(db, storage, "doc-1", "proj-1")
+
+    # Assert — committed, then unlinked, in that order (with the right key)
+    assert result is True
+    assert manager.mock_calls == [call.commit(), call.storage_delete("stored.pdf")]
+
+
+def test_delete_document_keeps_file_when_commit_fails():
+    # Arrange — commit blows up after the row delete is staged.
+    from src.modules.documents import services
+
+    db = Mock()
+    db.commit.side_effect = RuntimeError("boom")
+    storage = Mock()
+    doc = Mock()
+    doc.file_path = "stored.pdf"
+
+    # Act / Assert — the error propagates, the file is NOT removed, and we roll back.
+    with patch.object(services, "get_document", return_value=doc):
+        with pytest.raises(RuntimeError):
+            services.delete_document(db, storage, "doc-1", "proj-1")
+
+    db.rollback.assert_called_once()
+    storage.delete.assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # 401 — unauthenticated requests must be rejected on all endpoints
 # ---------------------------------------------------------------------------
@@ -363,10 +464,7 @@ def test_upload_document_without_token_returns_401(
     # Arrange — auth override removed via no_auth fixture
 
     # Act
-    response = client.post(
-        f"/project/{seeded_project.id}/documents",
-        json={"title": "Doc", "file_path": "/f/file.pdf"},
-    )
+    response = _upload(client, seeded_project.id)
 
     # Assert
     assert response.status_code == 401
@@ -388,14 +486,8 @@ def test_list_documents_nonexistent_project_returns_404(client: TestClient):
 
 
 def test_upload_document_nonexistent_project_returns_404(client: TestClient):
-    # Arrange
-    payload = {"title": "Doc", "file_path": "/f/file.pdf"}
-
     # Act
-    response = client.post(
-        f"/project/{NONEXISTENT_PROJECT_ID}/documents",
-        json=payload,
-    )
+    response = _upload(client, NONEXISTENT_PROJECT_ID)
 
     # Assert
     assert response.status_code == 404
@@ -459,14 +551,8 @@ def test_no_access_user_cannot_list_documents(
 def test_no_access_user_cannot_upload_document(
     client: TestClient, seeded_project: Project, as_no_access
 ):
-    # Arrange
-    payload = {"title": "Doc", "file_path": "/f/file.pdf"}
-
     # Act
-    response = client.post(
-        f"/project/{seeded_project.id}/documents",
-        json=payload,
-    )
+    response = _upload(client, seeded_project.id)
 
     # Assert
     assert response.status_code == 403
@@ -539,14 +625,8 @@ def test_participant_can_list_documents(
 def test_participant_can_upload_document(
     client: TestClient, seeded_project: Project, as_participant
 ):
-    # Arrange
-    payload = {"title": "Participant Doc", "file_path": "/f/part.pdf"}
-
     # Act
-    response = client.post(
-        f"/project/{seeded_project.id}/documents",
-        json=payload,
-    )
+    response = _upload(client, seeded_project.id, title="Participant Doc")
 
     # Assert
     assert response.status_code == 201

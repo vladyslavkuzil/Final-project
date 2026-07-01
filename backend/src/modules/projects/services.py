@@ -19,6 +19,7 @@ from .exceptions import (
     ProjectNotFoundError,
     ProjectAlreadyExistsError,
     UserNotFoundError,
+    OwnerCannotLeaveError,
 )
 
 
@@ -358,3 +359,51 @@ def add_user_to_project(db: Session, user_id: str, project_id: str, admin_id: st
         redis_client.delete(f"user:{u.id}:projects")
     redis_client.delete(f"user:{user_id}:project:{project_id}")
     return project
+
+
+def leave_project(db: Session, project_id: str, user_id: str) -> None:
+    """Remove the current user's own access to a project.
+
+    Args:
+        db: Active SQLAlchemy session.
+        project_id: Unique project UUID string.
+        user_id: ID of the user leaving the project.
+
+    Raises:
+        ProjectNotFoundError: If the project does not exist.
+        OwnerCannotLeaveError: If the user owns the project (they must delete
+            it instead of leaving).
+    """
+    project = db.query(Project).filter(Project.id == project_id).one_or_none()
+    if project is None:
+        raise ProjectNotFoundError(project_id)
+    if project.admin_id == user_id:
+        raise OwnerCannotLeaveError(project_id)
+
+    membership = (
+        db.query(ProjectMembership)
+        .filter(
+            ProjectMembership.project_id == project_id,
+            ProjectMembership.user_id == user_id,
+        )
+        .one_or_none()
+    )
+    user = db.query(User).filter(User.id == user_id).one_or_none()
+
+    # Capture the affected members before mutating so every member's cached
+    # project list is invalidated, not just the leaver's.
+    affected_user_ids = {u.id for u in project.users} | {user_id}
+
+    try:
+        if user is not None and user in project.users:
+            project.users.remove(user)
+        if membership is not None:
+            db.delete(membership)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    for uid in affected_user_ids:
+        redis_client.delete(f"user:{uid}:projects")
+    redis_client.delete(f"user:{user_id}:project:{project_id}")
