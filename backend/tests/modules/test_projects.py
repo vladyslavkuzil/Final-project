@@ -40,7 +40,6 @@ class SimpleProject:
         self.description = description
         self.admin_id = admin_id
         self.is_finished = False
-        self.users = []
         self.user_role: MembershipRole | None = None
 
         # New required fields
@@ -98,7 +97,23 @@ class ProjectServiceUnitTests(unittest.TestCase):
     @patch("src.modules.projects.services.TypeAdapter")
     def test_get_all_projects_returns_project_list(self, mock_type_adapter):
         projects = [SimpleProject("proj-1"), SimpleProject("proj-2")]
-        self.db.query.return_value = make_query(projects)
+        memberships = [
+            Mock(project_id="proj-1", role=MembershipRole.OWNER),
+            Mock(project_id="proj-2", role=MembershipRole.PARTICIPANT),
+        ]
+
+        # Pierwsze query: Project -> join -> filter -> distinct -> all
+        projects_query = Mock()
+        projects_query.join.return_value = projects_query
+        projects_query.filter.return_value = projects_query
+        projects_query.distinct.return_value = projects_query
+        projects_query.all.return_value = projects
+
+        # Drugie query: ProjectMembership -> filter (iterowane bez .all())
+        memberships_query = Mock()
+        memberships_query.filter.return_value = memberships
+
+        self.db.query.side_effect = [projects_query, memberships_query]
 
         expected_serialized = [{"id": "proj-1"}, {"id": "proj-2"}]
         mock_adapter = Mock()
@@ -243,41 +258,41 @@ class ProjectServiceUnitTests(unittest.TestCase):
         with self.assertRaises(OwnerCannotLeaveError):
             services.leave_project(self.db, project.id, "owner-id")
 
-def test_leave_project_removes_membership_and_user(self):
-    # Arrange — project lookup, membership lookup, then all-memberships lookup
-    project = SimpleProject(admin_id="owner-id")
-    membership = Mock(user_id="user-2")
-    all_memberships = [Mock(user_id="owner-id"), Mock(user_id="user-2")]
-    self.db.query.side_effect = [
-        make_query(project),
-        make_query(membership),
-        make_query(all_memberships),
-    ]
+    def test_leave_project_removes_membership_and_user(self):
+        # Arrange — project lookup, membership lookup, then all-memberships lookup
+        project = SimpleProject(admin_id="owner-id")
+        membership = Mock(user_id="user-2")
+        all_memberships = [Mock(user_id="owner-id"), Mock(user_id="user-2")]
+        self.db.query.side_effect = [
+            make_query(project),
+            make_query(membership),
+            make_query(all_memberships),
+        ]
 
-    # Act
-    services.leave_project(self.db, project.id, "user-2")
+        # Act
+        services.leave_project(self.db, project.id, "user-2")
 
-    # Assert — the membership row is deleted
-    self.db.delete.assert_called_once_with(membership)
-    self.db.commit.assert_called_once()
+        # Assert — the membership row is deleted
+        self.db.delete.assert_called_once_with(membership)
+        self.db.commit.assert_called_once()
 
-def test_leave_project_invalidates_every_member_cache(self):
-    # Arrange — a project with the owner and the leaving participant.
-    project = SimpleProject(admin_id="owner-id")
-    membership = Mock(user_id="user-2")
-    all_memberships = [Mock(user_id="owner-id"), Mock(user_id="user-2")]
-    self.db.query.side_effect = [
-        make_query(project),
-        make_query(membership),
-        make_query(all_memberships),
-    ]
+    def test_leave_project_invalidates_every_member_cache(self):
+        # Arrange — a project with the owner and the leaving participant.
+        project = SimpleProject(admin_id="owner-id")
+        membership = Mock(user_id="user-2")
+        all_memberships = [Mock(user_id="owner-id"), Mock(user_id="user-2")]
+        self.db.query.side_effect = [
+            make_query(project),
+            make_query(membership),
+            make_query(all_memberships),
+        ]
 
-    # Act
-    services.leave_project(self.db, project.id, "user-2")
+        # Act
+        services.leave_project(self.db, project.id, "user-2")
 
-    # Assert — the remaining owner's cached list is busted too, not just the leaver's
-    self.mock_redis.delete.assert_any_call("user:user-2:projects")
-    self.mock_redis.delete.assert_any_call("user:owner-id:projects")
+        # Assert — the remaining owner's cached list is busted too, not just the leaver's
+        self.mock_redis.delete.assert_any_call("user:user-2:projects")
+        self.mock_redis.delete.assert_any_call("user:owner-id:projects")
 
 # ---------------------------------------------------------------------------
 # Integration tests — POST /project/{project_id}/leave (route + RBAC)
