@@ -37,3 +37,18 @@ output "db_subnet_group_name" {
   description = "Name of the RDS DB subnet group"
   value       = module.vpc.db_subnet_group_name
 }
+
+output "db_endpoint" {
+  description = "Full RDS endpoint (host:port) for use in a connection string"
+  value = module.database.db_endpoint
+}
+
+output "db_port" {
+  description = "Port Postgres listens on"
+  value = module.database.db_port
+}
+
+output "db_name" {
+    description = "Name of the database"
+  value = module.database.db_name
+}

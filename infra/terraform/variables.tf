@@ -45,3 +45,14 @@ variable "availability_zones" {
   default     = ["eu-north-1a", "eu-north-1b"]
 }
 
+variable "db_username" {
+  description = "Master username for the database"
+  type      = string
+  sensitive = true
+}
+
+variable "db_password" {
+  description = "Master password for the database"
+  type      = string
+  sensitive = true
+}

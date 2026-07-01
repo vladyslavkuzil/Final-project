@@ -10,6 +10,22 @@ module "vpc" {
   availability_zones   = var.availability_zones
 }
 
+# Call the DATABASE module 
+module "database" {
+  source = "./modules/database"
+
+  project_name = var.project_name
+  db_subnet_group_name  = module.vpc.db_subnet_group_name
+  rds_security_group_id = aws_security_group.rds.id
+  db_name     = "final_project"
+  db_username = var.db_username
+  db_password = var.db_password
+
+  multi_az             = false # set to true for production
+  deletion_protection  = false # set to true for production
+  skip_final_snapshot  = true  # set to false for production
+}
+
 # ─── SECURITY GROUP: ALB ────────────────────────────────────────────────────
 # Accepts HTTP and HTTPS from anywhere on the internet
 
