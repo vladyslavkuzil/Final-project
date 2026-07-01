@@ -10,7 +10,7 @@ from typing import Sequence, Union
 
 
 revision: str = "8c5d2a4d4bb2"
-down_revision: Union[str, Sequence[str], None] = ("73feed320b1f", "d31e780e7725")
+down_revision: Union[str, Sequence[str], None] = "d31e780e7725"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
