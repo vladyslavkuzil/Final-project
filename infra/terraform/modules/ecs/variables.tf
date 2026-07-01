@@ -77,3 +77,13 @@ variable "algorithm" {
   type    = string
   default = "HS256"
 }
+
+variable "backend_target_group_arn" {
+  description = "ARN of the ALB target group for the backend service"
+  type        = string
+}
+
+variable "frontend_target_group_arn" {
+  description = "ARN of the ALB target group for the frontend service"
+  type        = string
+}
