@@ -9,6 +9,7 @@ from src.modules.projects.exceptions import (
     ProjectAlreadyExistsError,
     ProjectNotFoundError,
     UserNotFoundError,
+    OwnerCannotLeaveError,
 )
 
 router = APIRouter()
@@ -139,6 +140,29 @@ def delete_project(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
+        )
+
+
+@router.post(
+    "/project/{project_id}/leave",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def leave_project(
+    project_id: str,
+    db: Session = Depends(get_db),
+    access: AccessContext = Depends(require_role()),
+):
+    try:
+        services.leave_project(db, project_id, access.user_id)
+    except ProjectNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
+    except OwnerCannotLeaveError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Project owner cannot leave their own project",
         )
 
 

@@ -1,12 +1,21 @@
 import unittest
 from unittest.mock import Mock, patch
 from datetime import datetime
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+
 from src.core.enums import MembershipRole
+from src.modules.auth.models import User
+from src.modules.project_membership.models import ProjectMembership
 from src.modules.projects import services
+from src.modules.projects.models import Project
 from src.modules.projects.exceptions import (
     ProjectAlreadyExistsError,
     ProjectNotFoundError,
     UserNotFoundError,
+    OwnerCannotLeaveError,
 )
 
 
@@ -227,6 +236,175 @@ class ProjectServiceUnitTests(unittest.TestCase):
 
         self.db.commit.assert_called_once()
         self.assertIn(user, updated.users)
+
+    def test_leave_project_raises_when_project_missing(self):
+        # Arrange — the project lookup finds nothing
+        self.db.query.return_value = make_query(None)
+
+        # Act / Assert — leaving a non-existent project is an error
+        with self.assertRaises(ProjectNotFoundError):
+            services.leave_project(self.db, "missing-id", "user-2")
+
+    def test_leave_project_raises_when_owner_leaves(self):
+        # Arrange — a project whose owner is the user trying to leave
+        project = SimpleProject(admin_id="owner-id")
+        self.db.query.return_value = make_query(project)
+
+        # Act / Assert — the owner is not allowed to leave their own project
+        with self.assertRaises(OwnerCannotLeaveError):
+            services.leave_project(self.db, project.id, "owner-id")
+
+    def test_leave_project_removes_membership_and_user(self):
+        # Arrange — a participant who belongs to someone else's project alongside
+        # the owner. leave_project makes three lookups: project, membership, user.
+        project = SimpleProject(admin_id="owner-id")
+        membership = Mock()
+        owner = make_user(user_id="owner-id")
+        user = make_user(user_id="user-2")
+        project.users = [owner, user]
+        self.db.query.side_effect = [
+            make_query(project),
+            make_query(membership),
+            make_query(user),
+        ]
+
+        # Act
+        services.leave_project(self.db, project.id, "user-2")
+
+        # Assert — the user is removed from the project and the membership deleted
+        self.assertNotIn(user, project.users)
+        self.db.delete.assert_called_once_with(membership)
+        self.db.commit.assert_called_once()
+
+    def test_leave_project_invalidates_every_member_cache(self):
+        # Arrange — a project with the owner and the leaving participant.
+        project = SimpleProject(admin_id="owner-id")
+        membership = Mock()
+        owner = make_user(user_id="owner-id")
+        user = make_user(user_id="user-2")
+        project.users = [owner, user]
+        self.db.query.side_effect = [
+            make_query(project),
+            make_query(membership),
+            make_query(user),
+        ]
+
+        # Act
+        services.leave_project(self.db, project.id, "user-2")
+
+        # Assert — the remaining owner's cached list is busted too, not just the leaver's
+        self.mock_redis.delete.assert_any_call("user:user-2:projects")
+        self.mock_redis.delete.assert_any_call("user:owner-id:projects")
+
+
+# ---------------------------------------------------------------------------
+# Integration tests — POST /project/{project_id}/leave (route + RBAC)
+# ---------------------------------------------------------------------------
+
+
+class TestLeaveProjectEndpoint:
+    @pytest.fixture(autouse=True)
+    def _mock_redis(self):
+        with patch("src.modules.projects.services.redis_client") as mock:
+            mock.get.return_value = None
+            yield mock
+
+    @pytest.fixture
+    def auth_as(self):
+        from src.main import app
+        from src.core.security import get_current_user
+
+        def _set(user_id: str):
+            app.dependency_overrides[get_current_user] = lambda: user_id
+
+        yield _set
+        app.dependency_overrides.pop(get_current_user, None)
+
+    @pytest.fixture
+    def project_with_members(self, db: Session) -> Project:
+        owner = User(id="leave-owner", email="leave-owner@x.com", hashed_password="x")
+        participant = User(
+            id="leave-part", email="leave-part@x.com", hashed_password="x"
+        )
+        db.add_all([owner, participant])
+        db.flush()
+        project = Project(name="leave-endpoint-project", admin_id=owner.id)
+        project.users.extend([owner, participant])
+        db.add(project)
+        db.flush()
+        db.add_all(
+            [
+                ProjectMembership(
+                    project_id=project.id, user_id=owner.id, role=MembershipRole.OWNER
+                ),
+                ProjectMembership(
+                    project_id=project.id,
+                    user_id=participant.id,
+                    role=MembershipRole.PARTICIPANT,
+                ),
+            ]
+        )
+        db.flush()
+        return project
+
+    def test_participant_can_leave_returns_204(
+        self, client: TestClient, db: Session, project_with_members: Project, auth_as
+    ):
+        # Arrange — act as the participant (project seeded by the fixture)
+        auth_as("leave-part")
+
+        # Act
+        response = client.post(f"/project/{project_with_members.id}/leave")
+
+        # Assert — success, and the participant's membership row is gone
+        assert response.status_code == 204
+        membership = (
+            db.query(ProjectMembership)
+            .filter(
+                ProjectMembership.project_id == project_with_members.id,
+                ProjectMembership.user_id == "leave-part",
+            )
+            .one_or_none()
+        )
+        assert membership is None
+
+    def test_owner_cannot_leave_returns_403(
+        self, client: TestClient, project_with_members: Project, auth_as
+    ):
+        # Arrange — act as the owner
+        auth_as("leave-owner")
+
+        # Act
+        response = client.post(f"/project/{project_with_members.id}/leave")
+
+        # Assert — the owner cannot leave their own project
+        assert response.status_code == 403
+
+    def test_non_member_cannot_leave_returns_403(
+        self, client: TestClient, db: Session, project_with_members: Project, auth_as
+    ):
+        # Arrange — a user who is not a member of the project
+        outsider = User(id="leave-outsider", email="out@x.com", hashed_password="x")
+        db.add(outsider)
+        db.flush()
+        auth_as("leave-outsider")
+
+        # Act
+        response = client.post(f"/project/{project_with_members.id}/leave")
+
+        # Assert — non-members are denied
+        assert response.status_code == 403
+
+    def test_leave_without_token_returns_401(
+        self, client: TestClient, project_with_members: Project
+    ):
+        # Arrange — no auth override applied, so the request carries no token
+
+        # Act
+        response = client.post(f"/project/{project_with_members.id}/leave")
+
+        # Assert — unauthenticated requests are rejected
+        assert response.status_code == 401
 
 
 if __name__ == "__main__":

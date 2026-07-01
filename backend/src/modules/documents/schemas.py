@@ -5,22 +5,12 @@ from pydantic import BaseModel, field_validator
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".txt"}
 
 
-def _validate_file_path(value: str) -> str:
+def validate_file_path(value: str) -> str:
     ext = Path(value).suffix.lower()
     if ext not in ALLOWED_EXTENSIONS:
         allowed = ", ".join(sorted(ALLOWED_EXTENSIONS))
         raise ValueError(f"File extension '{ext}' is not allowed. Accepted: {allowed}")
     return value
-
-
-class DocumentCreate(BaseModel):
-    title: str
-    file_path: str
-
-    @field_validator("file_path")
-    @classmethod
-    def validate_extension(cls, v: str) -> str:
-        return _validate_file_path(v)
 
 
 class DocumentUpdate(BaseModel):
@@ -31,7 +21,7 @@ class DocumentUpdate(BaseModel):
     @classmethod
     def validate_extension(cls, v: str | None) -> str | None:
         if v is not None:
-            return _validate_file_path(v)
+            return validate_file_path(v)
         return v
 
 

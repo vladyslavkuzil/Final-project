@@ -1,8 +1,27 @@
+import { useState } from "react";
 import { useRouter } from "next/router";
-import { FOCUS_RING, Hov, INPUT_STYLE, LABEL_STYLE, Logo } from "../components/infoboard/ui";
+import { ERROR_STYLE, FOCUS_RING, Hov, INPUT_STYLE, LABEL_STYLE, Logo } from "../components/infoboard/ui";
+import { login } from "../lib/api";
 
 export default function Login() {
   const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    setError("");
+    setBusy(true);
+    try {
+      await login(email, password);
+      router.push("/projects");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Login failed");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div style={{ minHeight: "100vh", background: "#f7f7f5" }}>
@@ -26,7 +45,8 @@ export default function Login() {
             <Hov
               as="input"
               type="email"
-              defaultValue="alex@example.com"
+              value={email}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
               placeholder="you@example.com"
               style={{ ...INPUT_STYLE, marginBottom: 16 }}
               focusStyle={FOCUS_RING}
@@ -35,14 +55,18 @@ export default function Login() {
             <Hov
               as="input"
               type="password"
-              defaultValue="password"
+              value={password}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
+              onKeyDown={(e: React.KeyboardEvent) => e.key === "Enter" && submit()}
               placeholder="••••••••"
-              style={{ ...INPUT_STYLE, marginBottom: 22 }}
+              style={{ ...INPUT_STYLE, marginBottom: error ? 12 : 22 }}
               focusStyle={FOCUS_RING}
             />
+            {error && <p style={ERROR_STYLE}>{error}</p>}
             <Hov
               as="button"
-              onClick={() => router.push("/projects")}
+              onClick={submit}
+              disabled={busy}
               style={{
                 width: "100%",
                 padding: 10,
@@ -52,11 +76,12 @@ export default function Login() {
                 borderRadius: 8,
                 fontSize: 14,
                 fontWeight: 500,
-                cursor: "pointer",
+                cursor: busy ? "default" : "pointer",
+                opacity: busy ? 0.7 : 1,
               }}
               hoverStyle={{ background: "#2560d8" }}
             >
-              Log In
+              {busy ? "Logging in…" : "Log In"}
             </Hov>
           </div>
           <p style={{ textAlign: "center", margin: "18px 0 0", fontSize: 13.5, color: "#8b8a83" }}>

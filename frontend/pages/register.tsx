@@ -1,8 +1,32 @@
+import { useState } from "react";
 import { useRouter } from "next/router";
-import { FOCUS_RING, Hov, INPUT_STYLE, LABEL_STYLE, Logo } from "../components/infoboard/ui";
+import { ERROR_STYLE, FOCUS_RING, Hov, INPUT_STYLE, LABEL_STYLE, Logo } from "../components/infoboard/ui";
+import { register } from "../lib/api";
 
 export default function Register() {
   const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    setError("");
+    if (password !== confirm) {
+      setError("Passwords do not match");
+      return;
+    }
+    setBusy(true);
+    try {
+      await register(email, password);
+      router.push("/projects");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Registration failed");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div style={{ minHeight: "100vh", background: "#f7f7f5" }}>
@@ -28,6 +52,8 @@ export default function Register() {
             <Hov
               as="input"
               type="email"
+              value={email}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
               placeholder="you@example.com"
               style={{ ...INPUT_STYLE, marginBottom: 16 }}
               focusStyle={FOCUS_RING}
@@ -36,6 +62,8 @@ export default function Register() {
             <Hov
               as="input"
               type="password"
+              value={password}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
               placeholder="••••••••"
               style={{ ...INPUT_STYLE, marginBottom: 16 }}
               focusStyle={FOCUS_RING}
@@ -44,13 +72,18 @@ export default function Register() {
             <Hov
               as="input"
               type="password"
+              value={confirm}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirm(e.target.value)}
+              onKeyDown={(e: React.KeyboardEvent) => e.key === "Enter" && submit()}
               placeholder="••••••••"
-              style={{ ...INPUT_STYLE, marginBottom: 22 }}
+              style={{ ...INPUT_STYLE, marginBottom: error ? 12 : 22 }}
               focusStyle={FOCUS_RING}
             />
+            {error && <p style={ERROR_STYLE}>{error}</p>}
             <Hov
               as="button"
-              onClick={() => router.push("/projects")}
+              onClick={submit}
+              disabled={busy}
               style={{
                 width: "100%",
                 padding: 10,
@@ -60,11 +93,12 @@ export default function Register() {
                 borderRadius: 8,
                 fontSize: 14,
                 fontWeight: 500,
-                cursor: "pointer",
+                cursor: busy ? "default" : "pointer",
+                opacity: busy ? 0.7 : 1,
               }}
               hoverStyle={{ background: "#2560d8" }}
             >
-              Create Account
+              {busy ? "Creating…" : "Create Account"}
             </Hov>
           </div>
           <p style={{ textAlign: "center", margin: "18px 0 0", fontSize: 13.5, color: "#8b8a83" }}>
