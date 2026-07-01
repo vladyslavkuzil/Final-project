@@ -52,3 +52,33 @@ output "db_name" {
     description = "Name of the database"
   value = module.database.db_name
 }
+
+output "ecs_cluster_name" {
+  description = "Name of the ECS cluster"
+  value       = module.ecs.cluster_name
+}
+
+output "ecs_cluster_arn" {
+  description = "ARN of the ECS cluster"
+  value       = module.ecs.cluster_arn
+}
+
+output "backend_task_definition_arn" {
+  description = "ARN of the backend ECS task definition"
+  value       = module.ecs.backend_task_definition_arn
+}
+
+output "frontend_task_definition_arn" {
+  description = "ARN of the frontend ECS task definition"
+  value       = module.ecs.frontend_task_definition_arn
+}
+
+output "backend_log_group_name" {
+  description = "CloudWatch log group for backend service"
+  value       = module.ecs.backend_log_group_name
+}
+
+output "frontend_log_group_name" {
+  description = "CloudWatch log group for frontend service"
+  value       = module.ecs.frontend_log_group_name
+}
