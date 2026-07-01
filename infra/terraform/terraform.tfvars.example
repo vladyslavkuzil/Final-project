@@ -1,0 +1,43 @@
+# Copy this file to terraform.tfvars and fill in the values.
+# terraform.tfvars is gitignored — never commit it.
+
+# ─── AWS ────────────────────────────────────────────────────────────────────
+
+profile = "your-aws-cli-profile"   # AWS CLI profile name
+region  = "eu-north-1"             # optional, this is the default
+
+# ─── NAMING ─────────────────────────────────────────────────────────────────
+
+project_name = "final-project"     # optional, this is the default
+
+# ─── NETWORK ────────────────────────────────────────────────────────────────
+# Defaults below work for a standard single-VPC dev deployment.
+# Only override these if the CIDRs conflict with existing infrastructure.
+
+# vpc_cidr             = "10.0.0.0/16"
+# public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24"]
+# private_subnet_cidrs = ["10.0.3.0/24", "10.0.4.0/24"]
+# db_subnet_cidrs      = ["10.0.5.0/24", "10.0.6.0/24"]
+# availability_zones   = ["eu-north-1a", "eu-north-1b"]
+
+# ─── DATABASE CREDENTIALS ───────────────────────────────────────────────────
+# db_username must start with a letter and contain only letters, digits, underscores.
+# db_password must be 8–128 characters.
+
+db_username = "project_user"
+db_password = "change-me-strong-password"
+
+# ─── CONTAINER IMAGES ───────────────────────────────────────────────────────
+# Push your Docker images to ECR before running terraform apply.
+# Format: <account_id>.dkr.ecr.<region>.amazonaws.com/<repo>:<tag>
+
+backend_image  = "123456789.dkr.ecr.eu-north-1.amazonaws.com/final-project-backend:latest"
+frontend_image = "123456789.dkr.ecr.eu-north-1.amazonaws.com/final-project-frontend:latest"
+
+# ─── APPLICATION SECRETS ────────────────────────────────────────────────────
+# database_url: run `terraform apply` once first to get the RDS endpoint,
+# then update this value and run `terraform apply` again.
+
+database_url = "postgresql+psycopg://project_user:change-me-strong-password@YOUR_RDS_ENDPOINT:5432/final_project"
+secret_key   = "change-me-jwt-secret-min-32-chars"
+algorithm    = "HS256"             # optional, this is the default

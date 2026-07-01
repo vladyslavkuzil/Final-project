@@ -49,13 +49,6 @@ pip-delete-this-directory.txt
 # FastAPI / Uvicorn
 *.log
 
-# Terraform
-**/.terraform/
-*.tfstate
-*.tfstate.backup
-*.tfvars
-terraform.exe
-
 # Frontend / Node
 frontend/node_modules/
 node_modules/
@@ -77,14 +70,14 @@ postgres_data/
 *.pid
 
 # Terraform / IaC
-infra/.terraform/
-infra/.terraform.lock.hcl
-infra/*.tfstate
-infra/*.tfstate.*
-infra/crash.log
-infra/*.tfvars
-infra/*.tfvars.json
-**/.terraform.lock.hcl
+infra/**/.terraform/
+infra/**/.terraform.lock.hcl
+infra/**/*.tfstate
+infra/**/*.tfstate.*
+infra/**/crash.log
+infra/**/*.tfvars
+infra/**/*.tfvars.json
+!infra/**/*.tfvars.example
 
 # AWS / serverless build artifacts
 .aws-sam/

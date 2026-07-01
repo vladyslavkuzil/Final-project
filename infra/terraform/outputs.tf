@@ -82,3 +82,8 @@ output "frontend_log_group_name" {
   description = "CloudWatch log group for frontend service"
   value       = module.ecs.frontend_log_group_name
 }
+
+output "alb_dns_name" {
+  description = "Public DNS name of the Application Load Balancer — use this to reach the app"
+  value       = module.alb.alb_dns_name
+}
