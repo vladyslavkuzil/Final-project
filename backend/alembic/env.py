@@ -18,6 +18,7 @@ from src.modules.auth.models import User  # noqa: E402, F401
 from src.modules.projects.models import Project  # noqa: E402, F401
 from src.modules.documents.models import Document  # noqa: E402, F401
 from src.modules.project_membership.models import ProjectMembership, JoinCode  # noqa: E402, F401
+from src.modules.chat.models import Message  # noqa: E402, F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

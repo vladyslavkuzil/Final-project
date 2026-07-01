@@ -1,7 +1,7 @@
 // Central API client: a thin fetch wrapper that attaches the Bearer token
 // from localStorage on every request and normalizes error handling.
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 const TOKEN_KEY = "access_token";
 const EMAIL_KEY = "user_email";
@@ -27,6 +27,10 @@ export function setMyEmail(email: string): void {
 export function clearAuth(): void {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(EMAIL_KEY);
+}
+
+export function getApiBaseUrl(): string {
+  return BASE;
 }
 
 export class ApiError extends Error {

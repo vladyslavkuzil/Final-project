@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
+import { ProjectChatPanel } from "../../components/chat/project-chat";
 import { Hov } from "../../components/infoboard/ui";
 import { InviteModal, SettingsModal } from "../../components/infoboard/modals";
 import { useStore, type FileItem } from "../../lib/store";
@@ -42,7 +43,7 @@ export default function ProjectDashboard() {
   const id = typeof router.query.id === "string" ? router.query.id : "";
   const project = projects.find((p) => p.id === id);
 
-  const [tab, setTab] = useState<"files" | "members">("files");
+  const [tab, setTab] = useState<"files" | "members" | "chat">("files");
   const [modal, setModal] = useState<"invite" | "settings" | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -198,6 +199,9 @@ export default function ProjectDashboard() {
           <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <Hov as="a" onClick={() => setTab("files")} style={navStyle(tab === "files")} hoverStyle={{ background: "#efefec" }}>
               <span style={{ display: "flex", width: 16, justifyContent: "center" }}>▤</span>Files
+            </Hov>
+            <Hov as="a" onClick={() => setTab("chat")} style={navStyle(tab === "chat")} hoverStyle={{ background: "#efefec" }}>
+              <span style={{ display: "flex", width: 16, justifyContent: "center" }}>💬</span>Chat
             </Hov>
             <Hov
               as="a"
@@ -555,50 +559,8 @@ export default function ProjectDashboard() {
               </div>
             </main>
           )}
-        </div>
 
-        {/* Chat widget (disabled) */}
-        <div
-          title="Coming soon"
-          style={{
-            position: "fixed",
-            bottom: 22,
-            right: 22,
-            opacity: 0.5,
-            filter: "grayscale(1)",
-            cursor: "not-allowed",
-            zIndex: 30,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 9,
-              background: "#fff",
-              border: "1px solid #e3e3df",
-              borderRadius: 24,
-              padding: "10px 16px 10px 13px",
-              boxShadow: "0 4px 14px rgba(15,15,15,.1)",
-            }}
-          >
-            <span
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: "50%",
-                background: "#2f6fed",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#fff",
-                fontSize: 14,
-              }}
-            >
-              💬
-            </span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#37352f" }}>Project Chat</span>
-          </div>
+          {tab === "chat" && <ProjectChatPanel projectId={project.id} projectName={project.name} />}
         </div>
       </div>
 

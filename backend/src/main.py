@@ -11,6 +11,8 @@ from src.modules.documents.router import router as documents_router
 from src.modules.auth.router import router as auth_router, users_router
 from src.modules.projects.router import router as projects_router
 from src.modules.project_membership.router import router as project_membership_router
+from src.modules.chat.router import router as chat_router
+from src.modules.chat.ws import router as ws_router
 
 
 app = FastAPI(title="Project Dashboard API")
@@ -27,6 +29,8 @@ app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(projects_router)
 app.include_router(project_membership_router)
+app.include_router(chat_router)
+app.include_router(ws_router)
 
 
 @app.get("/health")
