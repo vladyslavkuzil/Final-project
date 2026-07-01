@@ -3,6 +3,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from src.modules.projects.models import Project
 from src.core.config import SECRET_KEY, ALGORITHM
+from src.modules.project_membership.models import ProjectMembership
 import jwt
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -70,4 +71,12 @@ def verify_project_access(project_id: str, user_id: str, db: Session) -> bool:
     if project.admin_id == user_id:
         return True
 
-    return any(user.id == user_id for user in project.users)
+    membership = (
+        db.query(ProjectMembership)
+        .filter(
+            ProjectMembership.project_id == project_id,
+            ProjectMembership.user_id == user_id,
+        )
+        .first()
+    )
+    return membership is not None
