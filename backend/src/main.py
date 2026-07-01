@@ -10,6 +10,8 @@ from src.modules.documents.models import Document  # noqa: F401 — registers ta
 from src.modules.documents.router import router as documents_router
 from src.modules.auth.router import router as auth_router, users_router
 from src.modules.projects.router import router as projects_router
+from src.modules.chat.router import router as chat_router
+from src.modules.chat.ws import router as ws_router
 
 app = FastAPI(title="Project Dashboard API")
 app.add_middleware(
@@ -24,6 +26,8 @@ app.include_router(documents_router, prefix="/project/{project_id}/documents")
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(projects_router)
+app.include_router(chat_router)
+app.include_router(ws_router)
 
 
 @app.get("/health")
