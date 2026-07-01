@@ -19,6 +19,10 @@ def register_user(db: Session, user: UserCreate):
     return db_user
 
 
+def get_user_by_email(db: Session, email: str) -> User | None:
+    return db.query(User).filter(User.email == email).first()
+
+
 def authenticate_user(db: Session, email: str, password: str):
     user = db.query(User).filter(User.email == email).first()
     if (
