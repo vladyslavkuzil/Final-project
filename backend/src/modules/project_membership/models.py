@@ -36,6 +36,7 @@ class ProjectMembership(Base):
 
 
 class JoinCode(Base):
+    __table_args__ = (UniqueConstraint("project_id"),)
     __tablename__ = "join_codes"
 
     id: Mapped[str] = mapped_column(

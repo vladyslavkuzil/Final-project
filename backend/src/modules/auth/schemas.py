@@ -10,9 +10,7 @@ class UserResponse(BaseModel):
     id: str
     email: EmailStr
     is_active: bool
-
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class Token(BaseModel):
