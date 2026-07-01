@@ -71,7 +71,7 @@ def retrieve_project_id(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Project not found."
         )
-    project["user_role"] = access.role
+    project.user_role = access.role
 
     return project
 
@@ -180,11 +180,10 @@ def invite_user(
     project_id: str,
     user_id: str,
     db: Session = Depends(get_db),
-    current_user: str = Depends(get_current_user),
     _: MembershipRole = Depends(require_role(MembershipRole.OWNER)),
 ):
     try:
-        return services.add_user_to_project(db, user_id, project_id, current_user)
+        return services.add_user_to_project(db, user_id, project_id)
     except ProjectNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

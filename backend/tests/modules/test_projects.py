@@ -243,48 +243,41 @@ class ProjectServiceUnitTests(unittest.TestCase):
         with self.assertRaises(OwnerCannotLeaveError):
             services.leave_project(self.db, project.id, "owner-id")
 
-    def test_leave_project_removes_membership_and_user(self):
-        # Arrange — a participant who belongs to someone else's project alongside
-        # the owner. leave_project makes three lookups: project, membership, user.
-        project = SimpleProject(admin_id="owner-id")
-        membership = Mock()
-        owner = make_user(user_id="owner-id")
-        user = make_user(user_id="user-2")
-        project.users = [owner, user]
-        self.db.query.side_effect = [
-            make_query(project),
-            make_query(membership),
-            make_query(user),
-        ]
+def test_leave_project_removes_membership_and_user(self):
+    # Arrange — project lookup, membership lookup, then all-memberships lookup
+    project = SimpleProject(admin_id="owner-id")
+    membership = Mock(user_id="user-2")
+    all_memberships = [Mock(user_id="owner-id"), Mock(user_id="user-2")]
+    self.db.query.side_effect = [
+        make_query(project),
+        make_query(membership),
+        make_query(all_memberships),
+    ]
 
-        # Act
-        services.leave_project(self.db, project.id, "user-2")
+    # Act
+    services.leave_project(self.db, project.id, "user-2")
 
-        # Assert — the user is removed from the project and the membership deleted
-        self.assertNotIn(user, project.users)
-        self.db.delete.assert_called_once_with(membership)
-        self.db.commit.assert_called_once()
+    # Assert — the membership row is deleted
+    self.db.delete.assert_called_once_with(membership)
+    self.db.commit.assert_called_once()
 
-    def test_leave_project_invalidates_every_member_cache(self):
-        # Arrange — a project with the owner and the leaving participant.
-        project = SimpleProject(admin_id="owner-id")
-        membership = Mock()
-        owner = make_user(user_id="owner-id")
-        user = make_user(user_id="user-2")
-        project.users = [owner, user]
-        self.db.query.side_effect = [
-            make_query(project),
-            make_query(membership),
-            make_query(user),
-        ]
+def test_leave_project_invalidates_every_member_cache(self):
+    # Arrange — a project with the owner and the leaving participant.
+    project = SimpleProject(admin_id="owner-id")
+    membership = Mock(user_id="user-2")
+    all_memberships = [Mock(user_id="owner-id"), Mock(user_id="user-2")]
+    self.db.query.side_effect = [
+        make_query(project),
+        make_query(membership),
+        make_query(all_memberships),
+    ]
 
-        # Act
-        services.leave_project(self.db, project.id, "user-2")
+    # Act
+    services.leave_project(self.db, project.id, "user-2")
 
-        # Assert — the remaining owner's cached list is busted too, not just the leaver's
-        self.mock_redis.delete.assert_any_call("user:user-2:projects")
-        self.mock_redis.delete.assert_any_call("user:owner-id:projects")
-
+    # Assert — the remaining owner's cached list is busted too, not just the leaver's
+    self.mock_redis.delete.assert_any_call("user:user-2:projects")
+    self.mock_redis.delete.assert_any_call("user:owner-id:projects")
 
 # ---------------------------------------------------------------------------
 # Integration tests — POST /project/{project_id}/leave (route + RBAC)
@@ -318,7 +311,6 @@ class TestLeaveProjectEndpoint:
         db.add_all([owner, participant])
         db.flush()
         project = Project(name="leave-endpoint-project", admin_id=owner.id)
-        project.users.extend([owner, participant])
         db.add(project)
         db.flush()
         db.add_all(

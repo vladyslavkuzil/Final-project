@@ -103,7 +103,6 @@ def create_project(
     Args:
         db: Active SQLAlchemy session.
         name: Unique project name.
-        user_id: ID of the authenticated user creating the project.
         description: Optional project description.
 
     Returns:
@@ -135,9 +134,7 @@ def create_project(
 
 
 def get_all_projects(db: Session, user_id: str):
-
     cache_key = f"user:{user_id}:projects"
-
     cached = redis_client.get(cache_key)
     if cached:
         return json.loads(cached)
@@ -150,17 +147,20 @@ def get_all_projects(db: Session, user_id: str):
         .all()
     )
 
-    adapter = TypeAdapter(list[ProjectResponse])
+    memberships_by_project = {
+        m.project_id: m.role
+        for m in db.query(ProjectMembership).filter(
+            ProjectMembership.user_id == user_id
+        )
+    }
+    for project in projects:
+        project.user_role = memberships_by_project.get(project.id)
 
+    adapter = TypeAdapter(list[ProjectResponse])
     serialized_projects = adapter.validate_python(projects)
     serialized_projects = adapter.dump_python(serialized_projects, mode="json")
 
-    redis_client.setex(
-        cache_key,
-        CACHE_TTL,
-        json.dumps(serialized_projects),
-    )
-
+    redis_client.setex(cache_key, CACHE_TTL, json.dumps(serialized_projects))
     return serialized_projects
 
 
@@ -176,7 +176,6 @@ def update_project(
     Args:
         db: Active SQLAlchemy session.
         project_id: Unique project UUID string.
-        user_id: ID of the user performing the update (must be owner).
         name: New unique project name.
         description: New project description.
         is_finished: Mark project as done.
@@ -232,7 +231,6 @@ def delete_project(db: Session, project_id: str) -> dict:
     Args:
         db: Active SQLAlchemy session.
         project_id: Unique project UUID string.
-        user_id: ID of the user performing the deletion (must be owner).
 
     Returns:
         A dict with a confirmation message.
@@ -270,7 +268,7 @@ def delete_project(db: Session, project_id: str) -> dict:
 
 
 def add_user_to_project(
-    db: Session, user_id: str, project_id: str, admin_id: str | None = None
+    db: Session, user_id: str, project_id: str
 ):
     """Grant access to the project for a specific user.
 
@@ -278,7 +276,6 @@ def add_user_to_project(
         db: Active SQLAlchemy session,
         user_id: User id to be added to Project,
         project_id: Unique project UUID string,
-        admin_id: Current logged user.
 
     Returns:
         Updated Project.
@@ -358,15 +355,17 @@ def leave_project(db: Session, project_id: str, user_id: str) -> None:
         )
         .one_or_none()
     )
-    user = db.query(User).filter(User.id == user_id).one_or_none()
 
     # Capture the affected members before mutating so every member's cached
     # project list is invalidated, not just the leaver's.
-    affected_user_ids = {u.id for u in project.users} | {user_id}
+    all_memberships = (
+        db.query(ProjectMembership)
+        .filter(ProjectMembership.project_id == project_id)
+        .all()
+    )
+    affected_user_ids = {m.user_id for m in all_memberships} | {user_id}
 
     try:
-        if user is not None and user in project.users:
-            project.users.remove(user)
         if membership is not None:
             db.delete(membership)
         db.commit()
