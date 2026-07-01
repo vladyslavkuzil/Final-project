@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 import secrets
+from psycopg2.errors import UniqueViolation
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from src.core.cache import redis_client
@@ -15,7 +16,7 @@ from src.modules.project_membership.exceptions import (
 )
 from src.modules.project_membership.models import ProjectMembership, JoinCode
 
-# Exclude visually ambiguous chars: 0/O, 1/I/L
+# Exclude visually ambiguous chars: 0/O, 1/I
 INVITE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 
@@ -150,15 +151,18 @@ def join_project(db: Session, code: str, user_id: str):
     try:
         _add_user(db=db, project_id=project_id, user_id=user_id)
         db.commit()
-        redis_client.delete(f"user:{user_id}:projects")
-        redis_client.delete(f"user:{user_id}:project:{project_id}")
-        return {"project_id": project_id}
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
-        raise AlreadyMemberError
+        if isinstance(e.orig, UniqueViolation):
+            raise AlreadyMemberError
+        raise
     except Exception:
         db.rollback()
         raise
+
+    redis_client.delete(f"user:{user_id}:projects")
+    redis_client.delete(f"project:{project_id}")
+    return {"project_id": project_id}
 
 
 def invite_user_by_email(db: Session, project_id: str, email: str):
@@ -173,15 +177,18 @@ def invite_user_by_email(db: Session, project_id: str, email: str):
     try:
         _add_user(db=db, project_id=project_id, user_id=user.id)
         db.commit()
-        redis_client.delete(f"user:{user.id}:projects")
-        redis_client.delete(f"user:{user.id}:project:{project_id}")
-        return {"message": "User invited successfully"}
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
-        raise AlreadyMemberError
+        if isinstance(e.orig, UniqueViolation):
+            raise AlreadyMemberError
+        raise
     except Exception:
         db.rollback()
         raise
+
+    redis_client.delete(f"user:{user.id}:projects")
+    redis_client.delete(f"project:{project_id}")
+    return {"message": "User invited successfully"}
 
 
 def get_users(db: Session, project_id: str):
@@ -224,9 +231,10 @@ def remove_user(db: Session, project_id: str, user_id: str, caller_id: str):
     try:
         db.delete(user_membership)
         db.commit()
-
     except Exception:
         db.rollback()
         raise
 
+    redis_client.delete(f"user:{user_id}:projects")
+    redis_client.delete(f"project:{project_id}")
     return {"message": "User removed from project"}
