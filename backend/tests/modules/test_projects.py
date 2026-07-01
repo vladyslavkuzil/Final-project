@@ -294,6 +294,7 @@ class ProjectServiceUnitTests(unittest.TestCase):
         self.mock_redis.delete.assert_any_call("user:user-2:projects")
         self.mock_redis.delete.assert_any_call("user:owner-id:projects")
 
+
 # ---------------------------------------------------------------------------
 # Integration tests — POST /project/{project_id}/leave (route + RBAC)
 # ---------------------------------------------------------------------------

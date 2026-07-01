@@ -267,9 +267,7 @@ def delete_project(db: Session, project_id: str) -> dict:
     return {"message": "Project deleted successfully"}
 
 
-def add_user_to_project(
-    db: Session, user_id: str, project_id: str
-):
+def add_user_to_project(db: Session, user_id: str, project_id: str):
     """Grant access to the project for a specific user.
 
     Args:
