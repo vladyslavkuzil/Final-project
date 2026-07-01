@@ -94,7 +94,9 @@ def retrieve_project_name(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
         ) from exc
     except AccessDeniedError as exc:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)
+        ) from exc
 
     return project
 

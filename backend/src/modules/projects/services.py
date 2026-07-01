@@ -212,7 +212,9 @@ def update_project(
 
     db.refresh(project)
     memberships = (
-        db.query(ProjectMembership).filter(ProjectMembership.project_id == project_id).all()
+        db.query(ProjectMembership)
+        .filter(ProjectMembership.project_id == project_id)
+        .all()
     )
     if not isinstance(memberships, list):
         memberships = [memberships]
@@ -243,7 +245,9 @@ def delete_project(db: Session, project_id: str) -> dict:
         raise ProjectNotFoundError(project_id)
 
     memberships = (
-        db.query(ProjectMembership).filter(ProjectMembership.project_id == project_id).all()
+        db.query(ProjectMembership)
+        .filter(ProjectMembership.project_id == project_id)
+        .all()
     )
     if not isinstance(memberships, list):
         memberships = [memberships]
@@ -315,7 +319,9 @@ def add_user_to_project(
 
     db.refresh(project)
     memberships = (
-        db.query(ProjectMembership).filter(ProjectMembership.project_id == project_id).all()
+        db.query(ProjectMembership)
+        .filter(ProjectMembership.project_id == project_id)
+        .all()
     )
     if not isinstance(memberships, list):
         memberships = [memberships]
