@@ -14,6 +14,7 @@ REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 REDIS_DB = int(os.getenv("REDIS_DB", "0"))
 CACHE_TTL = int(os.getenv("CACHE_TTL", "600"))
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/app/uploads")
+S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "")
 CORS_ORIGINS = [
     origin.strip()
     for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
