@@ -2,14 +2,33 @@ import React, { useState } from "react";
 import type { Project } from "../../lib/store";
 import { ERROR_STYLE, FOCUS_RING, Hov, INPUT_STYLE, LABEL_STYLE, Modal } from "./ui";
 
+// --- Notion-style design tokens --------------------------------------
+// Same palette as ProjectChatPanel.tsx. Once ./ui.tsx is shared, these
+// should move to one shared theme file so every component reads from
+// the same source instead of redefining hex values per-file.
+const notion = {
+  text: "#37352f",
+  textMuted: "#787774",
+  textFaint: "#9b9a97",
+  border: "rgba(55, 53, 47, 0.09)",
+  borderStrong: "rgba(55, 53, 47, 0.16)",
+  hoverWash: "rgba(55, 53, 47, 0.08)",
+  bgSubtle: "#f7f6f3",
+  primary: "#191919",
+  primaryHover: "#000000",
+  danger: "#eb5757",
+  toggleOn: "#22a559",
+  toggleOff: "#d8d7d1",
+};
+
 const CANCEL_STYLE: React.CSSProperties = {
   fontSize: 13,
   fontWeight: 500,
-  color: "#5c5b57",
+  color: notion.text,
   background: "#fff",
-  border: "1px solid #e3e3df",
-  borderRadius: 8,
-  padding: "8px 16px",
+  border: `1px solid ${notion.borderStrong}`,
+  borderRadius: 4,
+  padding: "6px 14px",
   cursor: "pointer",
 };
 
@@ -17,17 +36,17 @@ const CONFIRM_STYLE: React.CSSProperties = {
   fontSize: 13,
   fontWeight: 500,
   color: "#fff",
-  background: "#2f6fed",
+  background: notion.primary,
   border: "none",
-  borderRadius: 8,
-  padding: "8px 18px",
+  borderRadius: 4,
+  padding: "6px 16px",
   cursor: "pointer",
 };
 
 const FOOTER_STYLE: React.CSSProperties = {
   display: "flex",
   justifyContent: "flex-end",
-  gap: 10,
+  gap: 8,
 };
 
 // Shared submit lifecycle for the modals: tracks busy/error, runs the action,
@@ -78,9 +97,11 @@ export function NewProjectModal({
 
   return (
     <Modal maxWidth={440} onClose={onClose}>
-      <h2 style={{ margin: "0 0 18px", fontSize: 17, fontWeight: 600, letterSpacing: "-.3px" }}>New Project</h2>
+      <h2 style={{ margin: "0 0 18px", fontSize: 16, fontWeight: 700, letterSpacing: "-.2px", color: notion.text }}>
+        New Project
+      </h2>
       <label style={LABEL_STYLE}>
-        Project Name <span style={{ color: "#c0392b" }}>*</span>
+        Project Name <span style={{ color: notion.danger }}>*</span>
       </label>
       <Hov
         as="input"
@@ -91,7 +112,7 @@ export function NewProjectModal({
         focusStyle={FOCUS_RING}
       />
       <label style={LABEL_STYLE}>
-        Description <span style={{ color: "#b3b2ac", fontWeight: 400 }}>(optional)</span>
+        Description <span style={{ color: notion.textFaint, fontWeight: 400 }}>(optional)</span>
       </label>
       <Hov
         as="textarea"
@@ -104,10 +125,16 @@ export function NewProjectModal({
       />
       {error && <p style={ERROR_STYLE}>{error}</p>}
       <div style={FOOTER_STYLE}>
-        <Hov as="button" onClick={onClose} style={CANCEL_STYLE} hoverStyle={{ background: "#f4f4f2" }}>
+        <Hov as="button" onClick={onClose} style={CANCEL_STYLE} hoverStyle={{ background: notion.bgSubtle }}>
           Cancel
         </Hov>
-        <Hov as="button" onClick={create} disabled={busy} style={CONFIRM_STYLE} hoverStyle={{ background: "#2560d8" }}>
+        <Hov
+          as="button"
+          onClick={create}
+          disabled={busy}
+          style={CONFIRM_STYLE}
+          hoverStyle={{ background: notion.primaryHover }}
+        >
           {busy ? "Creating…" : "Create"}
         </Hov>
       </div>
@@ -136,8 +163,10 @@ export function InviteModal({
 
   return (
     <Modal maxWidth={420} onClose={onClose}>
-      <h2 style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 600, letterSpacing: "-.3px" }}>Invite User</h2>
-      <p style={{ margin: "0 0 18px", fontSize: 13, color: "#8b8a83" }}>
+      <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, letterSpacing: "-.2px", color: notion.text }}>
+        Invite User
+      </h2>
+      <p style={{ margin: "0 0 18px", fontSize: 13, color: notion.textMuted }}>
         Enter the email of the person to invite.
       </p>
       <label style={LABEL_STYLE}>Email</label>
@@ -152,10 +181,16 @@ export function InviteModal({
       />
       {error && <p style={ERROR_STYLE}>{error}</p>}
       <div style={FOOTER_STYLE}>
-        <Hov as="button" onClick={onClose} style={CANCEL_STYLE} hoverStyle={{ background: "#f4f4f2" }}>
+        <Hov as="button" onClick={onClose} style={CANCEL_STYLE} hoverStyle={{ background: notion.bgSubtle }}>
           Cancel
         </Hov>
-        <Hov as="button" onClick={send} disabled={busy} style={CONFIRM_STYLE} hoverStyle={{ background: "#2560d8" }}>
+        <Hov
+          as="button"
+          onClick={send}
+          disabled={busy}
+          style={CONFIRM_STYLE}
+          hoverStyle={{ background: notion.primaryHover }}
+        >
           {busy ? "Sending…" : "Send Invite"}
         </Hov>
       </div>
@@ -183,7 +218,9 @@ export function SettingsModal({
 
   return (
     <Modal maxWidth={440} onClose={onClose}>
-      <h2 style={{ margin: "0 0 18px", fontSize: 17, fontWeight: 600, letterSpacing: "-.3px" }}>Project Settings</h2>
+      <h2 style={{ margin: "0 0 18px", fontSize: 16, fontWeight: 700, letterSpacing: "-.2px", color: notion.text }}>
+        Project Settings
+      </h2>
       <label style={LABEL_STYLE}>Project Name</label>
       <Hov
         as="input"
@@ -206,29 +243,29 @@ export function SettingsModal({
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "12px 14px",
-          background: "#fafaf9",
-          border: "1px solid #ededea",
-          borderRadius: 8,
+          padding: "10px 12px",
+          background: notion.bgSubtle,
+          border: `1px solid ${notion.border}`,
+          borderRadius: 4,
           marginBottom: 22,
         }}
       >
         <div>
-          <div style={{ fontSize: 13.5, fontWeight: 500, color: "#37352f" }}>Mark as Finished</div>
-          <div style={{ fontSize: 12, color: "#9b9a93", marginTop: 1 }}>Archive this project as complete</div>
+          <div style={{ fontSize: 13.5, fontWeight: 500, color: notion.text }}>Mark as Finished</div>
+          <div style={{ fontSize: 12, color: notion.textFaint, marginTop: 1 }}>Archive this project as complete</div>
         </div>
         <button
           onClick={() => setFinished((v) => !v)}
           style={{
             position: "relative",
-            width: 38,
-            height: 22,
+            width: 36,
+            height: 20,
             borderRadius: 20,
             border: "none",
             cursor: "pointer",
             padding: 0,
             transition: "background .15s",
-            background: finished ? "#22a559" : "#d8d7d1",
+            background: finished ? notion.toggleOn : notion.toggleOff,
           }}
         >
           <span
@@ -236,8 +273,8 @@ export function SettingsModal({
               position: "absolute",
               top: 2,
               left: 2,
-              width: 18,
-              height: 18,
+              width: 16,
+              height: 16,
               borderRadius: "50%",
               background: "#fff",
               boxShadow: "0 1px 2px rgba(0,0,0,.2)",
@@ -249,7 +286,7 @@ export function SettingsModal({
       </div>
       {error && <p style={ERROR_STYLE}>{error}</p>}
       <div style={FOOTER_STYLE}>
-        <Hov as="button" onClick={onClose} style={CANCEL_STYLE} hoverStyle={{ background: "#f4f4f2" }}>
+        <Hov as="button" onClick={onClose} style={CANCEL_STYLE} hoverStyle={{ background: notion.bgSubtle }}>
           Cancel
         </Hov>
         <Hov
@@ -257,7 +294,7 @@ export function SettingsModal({
           onClick={submit}
           disabled={busy}
           style={CONFIRM_STYLE}
-          hoverStyle={{ background: "#2560d8" }}
+          hoverStyle={{ background: notion.primaryHover }}
         >
           {busy ? "Saving…" : "Save"}
         </Hov>

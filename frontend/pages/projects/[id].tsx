@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { ProjectChatPanel } from "../../components/chat/project-chat";
-import { Hov } from "../../components/infoboard/ui";
+import { Hov, notion } from "../../components/infoboard/ui";
 import { InviteModal, SettingsModal } from "../../components/infoboard/modals";
 import { useStore, type FileItem } from "../../lib/store";
 import { getToken } from "../../lib/api";
@@ -13,16 +13,58 @@ function navStyle(active: boolean): React.CSSProperties {
     display: "flex",
     alignItems: "center",
     gap: 9,
-    padding: "7px 8px",
-    borderRadius: 7,
+    padding: "6px 8px",
+    borderRadius: 4,
     fontSize: 13.5,
     cursor: "pointer",
     textDecoration: "none",
-    background: active ? "#efefec" : undefined,
-    color: active ? "#37352f" : "#5c5b57",
+    background: active ? notion.hoverWash : undefined,
+    color: active ? notion.text : notion.textMuted,
     fontWeight: active ? 600 : 450,
   };
 }
+
+const dangerBtn: React.CSSProperties = {
+  width: "100%",
+  fontSize: 13,
+  fontWeight: 500,
+  color: notion.danger,
+  background: "#fff",
+  border: `1px solid ${notion.border}`,
+  borderRadius: 4,
+  padding: 7,
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
+};
+
+const primaryBtn: React.CSSProperties = {
+  fontSize: 13,
+  fontWeight: 500,
+  color: "#fff",
+  background: notion.primary,
+  border: "none",
+  borderRadius: 4,
+  padding: "6px 14px",
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+};
+
+const iconBtn: React.CSSProperties = {
+  width: 26,
+  height: 26,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  background: "#fff",
+  border: `1px solid ${notion.border}`,
+  borderRadius: 4,
+  cursor: "pointer",
+};
 
 export default function ProjectDashboard() {
   const router = useRouter();
@@ -116,31 +158,19 @@ export default function ProjectDashboard() {
     );
   };
 
-  const iconBtn: React.CSSProperties = {
-    width: 28,
-    height: 28,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#fff",
-    border: "1px solid #e8e8e4",
-    borderRadius: 6,
-    cursor: "pointer",
-  };
-
   return (
-    <div style={{ minHeight: "100vh", background: "#f7f7f5" }}>
+    <div style={{ minHeight: "100vh", background: notion.bgSidebar, fontFamily: notion.font }}>
       <div style={{ display: "flex", minHeight: "100vh" }}>
         {/* Sidebar */}
         <aside
           style={{
-            width: 248,
+            width: 240,
             flexShrink: 0,
-            background: "#fbfbfa",
-            borderRight: "1px solid #ebebe8",
+            background: notion.bgSidebar,
+            borderRight: `1px solid ${notion.border}`,
             display: "flex",
             flexDirection: "column",
-            padding: "18px 14px",
+            padding: "16px 12px",
             position: "sticky",
             top: 0,
             height: "100vh",
@@ -151,16 +181,17 @@ export default function ProjectDashboard() {
             onClick={() => router.push("/projects")}
             style={{
               fontSize: 12.5,
-              color: "#9b9a93",
+              color: notion.textFaint,
               cursor: "pointer",
               textDecoration: "none",
               display: "flex",
               alignItems: "center",
               gap: 5,
-              marginBottom: 16,
-              padding: "0 6px",
+              marginBottom: 14,
+              padding: "4px 6px",
+              borderRadius: 4,
             }}
-            hoverStyle={{ color: "#5c5b57" }}
+            hoverStyle={{ background: notion.hoverWash, color: notion.text }}
           >
             ← All Projects
           </Hov>
@@ -169,16 +200,16 @@ export default function ProjectDashboard() {
               display: "flex",
               alignItems: "center",
               gap: 8,
-              padding: "0 6px 16px",
-              borderBottom: "1px solid #ededea",
-              marginBottom: 12,
+              padding: "0 6px 14px",
+              borderBottom: `1px solid ${notion.border}`,
+              marginBottom: 10,
             }}
           >
             <div
               style={{
-                width: 24,
-                height: 24,
-                borderRadius: 6,
+                width: 22,
+                height: 22,
+                borderRadius: 5,
                 background: "#2f6fed",
                 display: "flex",
                 alignItems: "center",
@@ -191,23 +222,23 @@ export default function ProjectDashboard() {
             >
               {projInitial}
             </div>
-            <span style={{ fontSize: 14.5, fontWeight: 600, letterSpacing: "-.2px", lineHeight: 1.2 }}>
+            <span style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-.1px", lineHeight: 1.2, color: notion.text }}>
               {project.name}
             </span>
           </div>
 
-          <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <Hov as="a" onClick={() => setTab("files")} style={navStyle(tab === "files")} hoverStyle={{ background: "#efefec" }}>
+          <nav style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            <Hov as="a" onClick={() => setTab("files")} style={navStyle(tab === "files")} hoverStyle={{ background: notion.hoverWash }}>
               <span style={{ display: "flex", width: 16, justifyContent: "center" }}>▤</span>Files
             </Hov>
-            <Hov as="a" onClick={() => setTab("chat")} style={navStyle(tab === "chat")} hoverStyle={{ background: "#efefec" }}>
+            <Hov as="a" onClick={() => setTab("chat")} style={navStyle(tab === "chat")} hoverStyle={{ background: notion.hoverWash }}>
               <span style={{ display: "flex", width: 16, justifyContent: "center" }}>💬</span>Chat
             </Hov>
             <Hov
               as="a"
               onClick={() => setTab("members")}
               style={navStyle(tab === "members")}
-              hoverStyle={{ background: "#efefec" }}
+              hoverStyle={{ background: notion.hoverWash }}
             >
               <span style={{ display: "flex", width: 16, justifyContent: "center" }}>◍</span>Members
             </Hov>
@@ -219,15 +250,15 @@ export default function ProjectDashboard() {
                   display: "flex",
                   alignItems: "center",
                   gap: 9,
-                  padding: "7px 8px",
-                  borderRadius: 7,
+                  padding: "6px 8px",
+                  borderRadius: 4,
                   fontSize: 13.5,
-                  color: "#5c5b57",
+                  color: notion.textMuted,
                   cursor: "pointer",
                   textDecoration: "none",
                   fontWeight: 450,
                 }}
-                hoverStyle={{ background: "#efefec" }}
+                hoverStyle={{ background: notion.hoverWash }}
               >
                 <span style={{ display: "flex", width: 16, justifyContent: "center" }}>⚙</span>Project Settings
               </Hov>
@@ -239,21 +270,7 @@ export default function ProjectDashboard() {
               <Hov
                 as="button"
                 onClick={onDeleteProject}
-                style={{
-                  width: "100%",
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: "#c0392b",
-                  background: "#fff",
-                  border: "1px solid #f0d4d0",
-                  borderRadius: 8,
-                  padding: 8,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 6,
-                }}
+                style={dangerBtn}
                 hoverStyle={{ background: "#fdf2f1", borderColor: "#e8b9b3" }}
               >
                 <span style={{ fontSize: 13 }}>🗑</span>Delete Project
@@ -265,21 +282,7 @@ export default function ProjectDashboard() {
               <Hov
                 as="button"
                 onClick={onLeaveProject}
-                style={{
-                  width: "100%",
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: "#c0392b",
-                  background: "#fff",
-                  border: "1px solid #f0d4d0",
-                  borderRadius: 8,
-                  padding: 8,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 6,
-                }}
+                style={dangerBtn}
                 hoverStyle={{ background: "#fdf2f1", borderColor: "#e8b9b3" }}
               >
                 <span style={{ fontSize: 14, lineHeight: 1 }}>⏻</span>Leave Project
@@ -293,7 +296,9 @@ export default function ProjectDashboard() {
           {tab === "files" && (
             <main style={{ padding: "30px 36px 90px", maxWidth: 980, width: "100%" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22 }}>
-                <h1 style={{ margin: 0, fontSize: 21, fontWeight: 600, letterSpacing: "-.4px" }}>Files</h1>
+                <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, letterSpacing: "-.2px", color: notion.text }}>
+                  Files
+                </h1>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -304,37 +309,25 @@ export default function ProjectDashboard() {
                 <Hov
                   as="button"
                   onClick={() => fileInputRef.current?.click()}
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 500,
-                    color: "#fff",
-                    background: "#2f6fed",
-                    border: "none",
-                    borderRadius: 8,
-                    padding: "8px 14px",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                  hoverStyle={{ background: "#2560d8" }}
+                  style={primaryBtn}
+                  hoverStyle={{ background: notion.primaryHover }}
                 >
                   <span style={{ fontSize: 14, marginTop: -1 }}>↑</span>Upload Document
                 </Hov>
               </div>
 
               {project.files.length > 0 ? (
-                <div style={{ background: "#fff", border: "1px solid #ebebe8", borderRadius: 12, overflow: "hidden" }}>
+                <div style={{ background: notion.bgPage, border: `1px solid ${notion.border}`, borderRadius: 6, overflow: "hidden" }}>
                   <div
                     style={{
                       display: "grid",
                       gridTemplateColumns: "1fr 90px 180px 110px 96px",
                       gap: 12,
-                      padding: "11px 18px",
-                      borderBottom: "1px solid #ededea",
+                      padding: "9px 18px",
+                      borderBottom: `1px solid ${notion.border}`,
                       fontSize: 11.5,
                       fontWeight: 600,
-                      color: "#9b9a93",
+                      color: notion.textFaint,
                       textTransform: "uppercase",
                       letterSpacing: ".4px",
                     }}
@@ -352,12 +345,12 @@ export default function ProjectDashboard() {
                         display: "grid",
                         gridTemplateColumns: "1fr 90px 180px 110px 96px",
                         gap: 12,
-                        padding: "12px 18px",
-                        borderBottom: "1px solid #f3f3f1",
+                        padding: "10px 18px",
+                        borderBottom: `1px solid ${notion.border}`,
                         alignItems: "center",
                         fontSize: 13,
                       }}
-                      hoverStyle={{ background: "#fafaf9" }}
+                      hoverStyle={{ background: notion.hoverWash }}
                     >
                       <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                         <span
@@ -369,7 +362,7 @@ export default function ProjectDashboard() {
                             color: "#fff",
                             background: f.color,
                             padding: "4px 0",
-                            borderRadius: 5,
+                            borderRadius: 4,
                             letterSpacing: ".3px",
                           }}
                         >
@@ -378,7 +371,7 @@ export default function ProjectDashboard() {
                         <span
                           style={{
                             fontWeight: 500,
-                            color: "#37352f",
+                            color: notion.text,
                             whiteSpace: "nowrap",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
@@ -387,20 +380,20 @@ export default function ProjectDashboard() {
                           {f.name}
                         </span>
                       </div>
-                      <span style={{ color: "#8b8a83" }}>{f.size}</span>
+                      <span style={{ color: notion.textMuted }}>{f.size}</span>
                       <span
-                        style={{ color: "#8b8a83", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                        style={{ color: notion.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
                       >
                         {f.by}
                       </span>
-                      <span style={{ color: "#8b8a83" }}>{f.date}</span>
+                      <span style={{ color: notion.textMuted }}>{f.date}</span>
                       <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
                         <Hov
                           as="button"
                           title="Download"
                           onClick={() => onDownload(f)}
-                          style={{ ...iconBtn, color: "#6b6b67", fontSize: 13 }}
-                          hoverStyle={{ background: "#f4f4f2", color: "#37352f" }}
+                          style={{ ...iconBtn, color: notion.textMuted, fontSize: 13 }}
+                          hoverStyle={{ background: notion.bgSubtle, color: notion.text }}
                         >
                           ↓
                         </Hov>
@@ -408,8 +401,8 @@ export default function ProjectDashboard() {
                           as="button"
                           title="Rename"
                           onClick={() => onRename(f)}
-                          style={{ ...iconBtn, color: "#6b6b67", fontSize: 12 }}
-                          hoverStyle={{ background: "#f4f4f2", color: "#37352f" }}
+                          style={{ ...iconBtn, color: notion.textMuted, fontSize: 12 }}
+                          hoverStyle={{ background: notion.bgSubtle, color: notion.text }}
                         >
                           ✎
                         </Hov>
@@ -418,7 +411,7 @@ export default function ProjectDashboard() {
                             as="button"
                             title="Delete"
                             onClick={() => onDelete(f)}
-                            style={{ ...iconBtn, color: "#c0392b", fontSize: 12 }}
+                            style={{ ...iconBtn, color: notion.danger, fontSize: 12 }}
                             hoverStyle={{ background: "#fdf2f1", borderColor: "#e8b9b3" }}
                           >
                             🗑
@@ -433,9 +426,9 @@ export default function ProjectDashboard() {
                   style={{
                     textAlign: "center",
                     padding: "64px 20px",
-                    background: "#fff",
-                    border: "1px solid #ebebe8",
-                    borderRadius: 12,
+                    background: notion.bgPage,
+                    border: `1px solid ${notion.border}`,
+                    borderRadius: 6,
                   }}
                 >
                   <div
@@ -443,13 +436,13 @@ export default function ProjectDashboard() {
                       width: 96,
                       height: 70,
                       margin: "0 auto 18px",
-                      borderRadius: 10,
-                      border: "1px dashed #d6d5ce",
+                      borderRadius: 6,
+                      border: `1px dashed ${notion.borderStrong}`,
                       background:
                         "repeating-linear-gradient(45deg,#f4f4f2,#f4f4f2 8px,#efefec 8px,#efefec 16px)",
                     }}
                   />
-                  <p style={{ margin: 0, fontSize: 14, color: "#8b8a83" }}>No files yet. Upload the first one.</p>
+                  <p style={{ margin: 0, fontSize: 14, color: notion.textMuted }}>No files yet. Upload the first one.</p>
                 </div>
               )}
             </main>
@@ -458,31 +451,21 @@ export default function ProjectDashboard() {
           {tab === "members" && (
             <main style={{ padding: "30px 36px 90px", maxWidth: 760, width: "100%" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22 }}>
-                <h1 style={{ margin: 0, fontSize: 21, fontWeight: 600, letterSpacing: "-.4px" }}>Members</h1>
+                <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, letterSpacing: "-.2px", color: notion.text }}>
+                  Members
+                </h1>
                 {isAdmin && (
                   <Hov
                     as="button"
                     onClick={() => setModal("invite")}
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 500,
-                      color: "#fff",
-                      background: "#2f6fed",
-                      border: "none",
-                      borderRadius: 8,
-                      padding: "8px 14px",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                    }}
-                    hoverStyle={{ background: "#2560d8" }}
+                    style={primaryBtn}
+                    hoverStyle={{ background: notion.primaryHover }}
                   >
                     <span style={{ fontSize: 15, marginTop: -1 }}>+</span>Invite User
                   </Hov>
                 )}
               </div>
-              <div style={{ background: "#fff", border: "1px solid #ebebe8", borderRadius: 12, overflow: "hidden" }}>
+              <div style={{ background: notion.bgPage, border: `1px solid ${notion.border}`, borderRadius: 6, overflow: "hidden" }}>
                 {project.members.map((m, i) => (
                   <div
                     key={m.email + i}
@@ -490,28 +473,28 @@ export default function ProjectDashboard() {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
-                      padding: "14px 18px",
-                      borderBottom: "1px solid #f3f3f1",
+                      padding: "12px 18px",
+                      borderBottom: `1px solid ${notion.border}`,
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
                       <div
                         style={{
-                          width: 32,
-                          height: 32,
+                          width: 30,
+                          height: 30,
                           borderRadius: "50%",
-                          background: "#eef0f4",
+                          background: notion.bgSubtle,
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
                           fontSize: 13,
                           fontWeight: 600,
-                          color: "#5c5b57",
+                          color: notion.textMuted,
                         }}
                       >
                         {initialOf(m.email)}
                       </div>
-                      <span style={{ fontSize: 13.5, fontWeight: 500 }}>{m.email}</span>
+                      <span style={{ fontSize: 13.5, fontWeight: 500, color: notion.text }}>{m.email}</span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -520,21 +503,21 @@ export default function ProjectDashboard() {
                             width: 7,
                             height: 7,
                             borderRadius: "50%",
-                            background: m.active ? "#22a559" : "#d0a02b",
+                            background: m.active ? "#4f8a5b" : "#d0a02b",
                             display: "inline-block",
                           }}
                         />
-                        <span style={{ fontSize: 12, color: "#9b9a93" }}>{m.active ? "Active" : "Pending"}</span>
+                        <span style={{ fontSize: 12, color: notion.textFaint }}>{m.active ? "Active" : "Pending"}</span>
                       </div>
                       {m.role === "Admin" ? (
                         <span
                           style={{
                             fontSize: 11,
                             fontWeight: 600,
-                            color: "#1a56db",
-                            background: "#e8f0fe",
+                            color: notion.accentBlue,
+                            background: notion.bgSubtle,
                             padding: "3px 9px",
-                            borderRadius: 20,
+                            borderRadius: 4,
                           }}
                         >
                           Admin
@@ -544,10 +527,10 @@ export default function ProjectDashboard() {
                           style={{
                             fontSize: 11,
                             fontWeight: 600,
-                            color: "#6b6b67",
-                            background: "#f0f0ee",
+                            color: notion.textMuted,
+                            background: notion.bgSubtle,
                             padding: "3px 9px",
-                            borderRadius: 20,
+                            borderRadius: 4,
                           }}
                         >
                           Member

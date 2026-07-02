@@ -5,6 +5,49 @@ import { NewProjectModal } from "../../components/infoboard/modals";
 import { useStore } from "../../lib/store";
 import { clearAuth, getToken } from "../../lib/api";
 
+// ── shared token object (ideally imported from a theme file) ──────────────────
+const notion = {
+  text: "#37352f",
+  textMuted: "#787774",
+  textFaint: "#9b9a97",
+  border: "rgba(55, 53, 47, 0.09)",
+  borderStrong: "rgba(55, 53, 47, 0.16)",
+  hoverWash: "rgba(55, 53, 47, 0.08)",
+  bgPage: "#ffffff",
+  bgSidebar: "#fbfbfa",
+  bgSubtle: "#f7f6f3",
+  accentBlue: "#2383e2",
+  font: '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol"',
+};
+
+// ── tiny badge helper ─────────────────────────────────────────────────────────
+function Badge({
+  label,
+  color,
+  bg,
+}: {
+  label: string;
+  color: string;
+  bg: string;
+}) {
+  return (
+    <span
+      style={{
+        fontSize: 11,
+        fontWeight: 600,
+        color,
+        background: bg,
+        padding: "2px 7px",
+        borderRadius: 3, // Notion uses very small radii on tags
+        letterSpacing: ".1px",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
 export default function ProjectsHome() {
   const router = useRouter();
   const { me, projects, createProject, refresh } = useStore();
@@ -25,75 +68,130 @@ export default function ProjectsHome() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f7f7f5" }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: notion.bgSubtle,
+        fontFamily: notion.font,
+        color: notion.text,
+      }}
+    >
+      {/* ── Top bar ── */}
       <header
         style={{
-          height: 56,
-          background: "#fff",
-          borderBottom: "1px solid #ebebe8",
+          height: 52,
+          background: notion.bgSidebar,
+          borderBottom: `1px solid ${notion.border}`,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "0 24px",
+          padding: "0 20px",
           position: "sticky",
           top: 0,
           zIndex: 10,
         }}
       >
         <Logo size="sm" />
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <span style={{ fontSize: 13, color: "#8b8a83" }}>{me}</span>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {/* User pill — matches the status pill in ProjectChatPanel */}
+          <span
+            style={{
+              fontSize: 12.5,
+              fontWeight: 500,
+              color: notion.textMuted,
+              background: notion.bgSubtle,
+              borderRadius: 4,
+              padding: "4px 8px",
+            }}
+          >
+            {me}
+          </span>
+
           <Hov
             as="button"
             onClick={logout}
             style={{
-              fontSize: 13,
-              color: "#5c5b57",
-              background: "#fff",
-              border: "1px solid #e3e3df",
-              borderRadius: 7,
-              padding: "6px 12px",
-              cursor: "pointer",
+              fontSize: 12.5,
               fontWeight: 500,
+              color: notion.textMuted,
+              background: "transparent",
+              border: `1px solid ${notion.border}`,
+              borderRadius: 4,
+              padding: "4px 10px",
+              cursor: "pointer",
+              fontFamily: "inherit",
             }}
-            hoverStyle={{ background: "#f4f4f2" }}
+            hoverStyle={{ background: notion.hoverWash }}
           >
-            Log Out
+            Log out
           </Hov>
         </div>
       </header>
 
-      <main style={{ maxWidth: 1080, margin: "0 auto", padding: "36px 24px 80px" }}>
+      {/* ── Page body ── */}
+      <main
+        style={{
+          maxWidth: 1000,
+          margin: "0 auto",
+          padding: "44px 32px 80px",
+        }}
+      >
+        {/* Page title row */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            marginBottom: 26,
+            marginBottom: 28,
             gap: 16,
             flexWrap: "wrap",
           }}
         >
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600, letterSpacing: "-.5px" }}>My Projects</h1>
-          <div style={{ display: "flex", gap: 10 }}>
-            <div title="Coming soon" style={{ opacity: 0.5, cursor: "not-allowed", filter: "grayscale(1)" }}>
-              <button
-                disabled
-                style={{
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: "#5c5b57",
-                  background: "#fff",
-                  border: "1px solid #e3e3df",
-                  borderRadius: 8,
-                  padding: "8px 14px",
-                  cursor: "not-allowed",
-                  pointerEvents: "none",
-                }}
-              >
-                Join Project
-              </button>
-            </div>
+          <div>
+            <h1
+              style={{
+                margin: 0,
+                fontSize: 22,
+                fontWeight: 700,
+                letterSpacing: "-.3px",
+                color: notion.text,
+              }}
+            >
+              My Projects
+            </h1>
+            <p
+              style={{
+                margin: "3px 0 0",
+                fontSize: 13,
+                color: notion.textMuted,
+              }}
+            >
+              {projects.length} project{projects.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+
+          <div style={{ display: "flex", gap: 8 }}>
+            {/* Disabled "Join" — kept but styled consistently */}
+            <button
+              disabled
+              title="Coming soon"
+              style={{
+                fontSize: 13,
+                fontWeight: 500,
+                color: notion.textFaint,
+                background: "transparent",
+                border: `1px solid ${notion.border}`,
+                borderRadius: 4,
+                padding: "6px 12px",
+                cursor: "not-allowed",
+                opacity: 0.5,
+                fontFamily: "inherit",
+              }}
+            >
+              Join project
+            </button>
+
             <Hov
               as="button"
               onClick={() => setShowNew(true)}
@@ -101,158 +199,43 @@ export default function ProjectsHome() {
                 fontSize: 13,
                 fontWeight: 500,
                 color: "#fff",
-                background: "#2f6fed",
+                background: "#191919", // matches the Send button in chat
                 border: "none",
-                borderRadius: 8,
-                padding: "8px 14px",
+                borderRadius: 4,
+                padding: "6px 12px",
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
-                gap: 6,
+                gap: 5,
+                fontFamily: "inherit",
               }}
-              hoverStyle={{ background: "#2560d8" }}
+              hoverStyle={{ background: "#000" }}
             >
-              <span style={{ fontSize: 15, lineHeight: 1, marginTop: -1 }}>+</span>New Project
+              <span style={{ fontSize: 16, lineHeight: 1, marginTop: -1 }}>+</span>
+              New project
             </Hov>
           </div>
         </div>
 
+        {/* ── Project grid ── */}
         {projects.length > 0 ? (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 16 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+              gap: 10, // Notion uses tighter gaps than typical card grids
+            }}
+          >
             {projects.map((p) => (
-              <Hov
+              <ProjectCard
                 key={p.id}
+                project={p}
                 onClick={() => router.push(`/projects/${p.id}`)}
-                style={{
-                  background: "#fff",
-                  border: "1px solid #ebebe8",
-                  borderRadius: 12,
-                  padding: "18px 18px 16px",
-                  cursor: "pointer",
-                  transition: "box-shadow .15s,transform .15s",
-                  display: "flex",
-                  flexDirection: "column",
-                }}
-                hoverStyle={{
-                  boxShadow: "0 4px 16px rgba(15,15,15,.08)",
-                  transform: "translateY(-2px)",
-                  borderColor: "#e0dfd9",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    justifyContent: "space-between",
-                    gap: 10,
-                    marginBottom: 9,
-                  }}
-                >
-                  <h3 style={{ margin: 0, fontSize: 15.5, fontWeight: 600, letterSpacing: "-.2px", lineHeight: 1.3 }}>
-                    {p.name}
-                  </h3>
-                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                    {p.finished && (
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: "#1e7e45",
-                          background: "#e6f4ea",
-                          padding: "3px 8px",
-                          borderRadius: 20,
-                        }}
-                      >
-                        Finished
-                      </span>
-                    )}
-                    {p.myRole === "Admin" ? (
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: "#1a56db",
-                          background: "#e8f0fe",
-                          padding: "3px 8px",
-                          borderRadius: 20,
-                        }}
-                      >
-                        Admin
-                      </span>
-                    ) : (
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: "#6b6b67",
-                          background: "#f0f0ee",
-                          padding: "3px 8px",
-                          borderRadius: 20,
-                        }}
-                      >
-                        Member
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <p
-                  style={{
-                    margin: "0 0 18px",
-                    fontSize: 13,
-                    color: "#8b8a83",
-                    lineHeight: 1.5,
-                    display: "-webkit-box",
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: "vertical",
-                    overflow: "hidden",
-                    minHeight: 38,
-                  }}
-                >
-                  {p.desc}
-                </p>
-                <div
-                  style={{
-                    marginTop: "auto",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    fontSize: 12,
-                    color: "#9b9a93",
-                    borderTop: "1px solid #f0f0ee",
-                    paddingTop: 12,
-                  }}
-                >
-                  <span>{p.filesCount} files</span>
-                  <span style={{ color: "#d8d7d1" }}>·</span>
-                  <span>{p.size}</span>
-                  <span style={{ color: "#d8d7d1" }}>·</span>
-                  <span>{p.created}</span>
-                </div>
-              </Hov>
+              />
             ))}
           </div>
         ) : (
-          <div style={{ textAlign: "center", padding: "70px 20px" }}>
-            <div
-              style={{
-                width: 120,
-                height: 88,
-                margin: "0 auto 20px",
-                borderRadius: 12,
-                border: "1px dashed #d6d5ce",
-                background:
-                  "repeating-linear-gradient(45deg,#f4f4f2,#f4f4f2 8px,#efefec 8px,#efefec 16px)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                font: "11px ui-monospace,Menlo,monospace",
-                color: "#b3b2ac",
-              }}
-            >
-              empty
-            </div>
-            <p style={{ margin: 0, fontSize: 14.5, color: "#8b8a83" }}>No projects yet. Create one to get started.</p>
-          </div>
+          <EmptyState onNew={() => setShowNew(true)} />
         )}
       </main>
 
@@ -263,5 +246,184 @@ export default function ProjectsHome() {
         />
       )}
     </div>
+  );
+}
+
+// ── Project card ──────────────────────────────────────────────────────────────
+// Extracted so the parent render stays readable.
+function ProjectCard({
+  project: p,
+  onClick,
+}: {
+  project: ReturnType<typeof useStore>["projects"][number];
+  onClick: () => void;
+}) {
+  return (
+    <Hov
+      onClick={onClick}
+      style={{
+        background: notion.bgPage,
+        border: `1px solid ${notion.border}`,
+        borderRadius: 6, // Notion uses 6px, not 12px
+        padding: "14px 16px 12px",
+        cursor: "pointer",
+        display: "flex",
+        flexDirection: "column",
+        transition: "background 100ms ease",
+      }}
+      hoverStyle={{
+        background: notion.bgSidebar,
+        borderColor: notion.borderStrong,
+      }}
+    >
+      {/* Card header */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 10,
+          marginBottom: 6,
+        }}
+      >
+        <h3
+          style={{
+            margin: 0,
+            fontSize: 14,
+            fontWeight: 600,
+            letterSpacing: "-.1px",
+            lineHeight: 1.4,
+            color: notion.text,
+          }}
+        >
+          {p.name}
+        </h3>
+
+        <div style={{ display: "flex", gap: 4, flexShrink: 0, marginTop: 1 }}>
+          {p.finished && (
+            <Badge label="Finished" color="#4f8a5b" bg="rgba(79,138,91,0.12)" />
+          )}
+          {p.myRole === "Admin" ? (
+            <Badge label="Admin" color={notion.accentBlue} bg="rgba(35,131,226,0.1)" />
+          ) : (
+            <Badge label="Member" color={notion.textMuted} bg={notion.bgSubtle} />
+          )}
+        </div>
+      </div>
+
+      {/* Description */}
+      <p
+        style={{
+          margin: "0 0 14px",
+          fontSize: 13,
+          color: notion.textMuted,
+          lineHeight: 1.5,
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
+          minHeight: 36,
+        }}
+      >
+        {p.desc || (
+          <span style={{ color: notion.textFaint, fontStyle: "italic" }}>
+            No description
+          </span>
+        )}
+      </p>
+
+      {/* Footer meta */}
+      <div
+        style={{
+          marginTop: "auto",
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          fontSize: 12,
+          color: notion.textFaint,
+          borderTop: `1px solid ${notion.border}`,
+          paddingTop: 10,
+        }}
+      >
+        <span>{p.filesCount} files</span>
+        <Dot />
+        <span>{p.size}</span>
+        <Dot />
+        <span>{p.created}</span>
+      </div>
+    </Hov>
+  );
+}
+
+// ── Empty state ───────────────────────────────────────────────────────────────
+function EmptyState({ onNew }: { onNew: () => void }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        padding: "80px 20px",
+        gap: 14,
+      }}
+    >
+      {/* Notion-style dashed placeholder block */}
+      <div
+        style={{
+          width: 100,
+          height: 72,
+          borderRadius: 6,
+          border: `1px dashed ${notion.borderStrong}`,
+          background: notion.bgSubtle,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 11,
+          fontFamily: "ui-monospace, Menlo, monospace",
+          color: notion.textFaint,
+          letterSpacing: ".5px",
+        }}
+      >
+        empty
+      </div>
+
+      <p
+        style={{
+          margin: 0,
+          fontSize: 14,
+          color: notion.textMuted,
+          textAlign: "center",
+          lineHeight: 1.6,
+        }}
+      >
+        No projects yet.
+      </p>
+
+      <Hov
+        as="button"
+        onClick={onNew}
+        style={{
+          fontSize: 13,
+          fontWeight: 500,
+          color: notion.textMuted,
+          background: "transparent",
+          border: `1px solid ${notion.border}`,
+          borderRadius: 4,
+          padding: "6px 14px",
+          cursor: "pointer",
+          fontFamily: notion.font,
+        }}
+        hoverStyle={{ background: notion.hoverWash }}
+      >
+        Create your first project
+      </Hov>
+    </div>
+  );
+}
+
+// ── Tiny separator dot ────────────────────────────────────────────────────────
+function Dot() {
+  return (
+    <span style={{ color: notion.border, userSelect: "none" }}>·</span>
   );
 }

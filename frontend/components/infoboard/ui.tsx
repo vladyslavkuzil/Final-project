@@ -55,45 +55,73 @@ export function Hov({
   );
 }
 
+// --- Notion-style design tokens --------------------------------------
+// Shared across ProjectChatPanel.tsx and modals.tsx too. Consider moving
+// this to its own theme.ts once you're happy with it, so all three files
+// (and anything new) import from one place instead of redefining it.
+export const notion = {
+  text: "#37352f",
+  textMuted: "#787774",
+  textFaint: "#9b9a97",
+  border: "rgba(55, 53, 47, 0.09)",
+  borderStrong: "rgba(55, 53, 47, 0.16)",
+  hoverWash: "rgba(55, 53, 47, 0.08)",
+  bgPage: "#ffffff",
+  bgSidebar: "#fbfbfa",
+  bgSubtle: "#f7f6f3",
+  accentBlue: "#2383e2",
+  primary: "#191919",
+  primaryHover: "#000000",
+  danger: "#eb5757",
+  font:
+    '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol"',
+};
+
+// Notion's focus ring is a plain 2px outline in its accent blue, no glow.
 export const FOCUS_RING: React.CSSProperties = {
-  borderColor: "#2f6fed",
-  boxShadow: "0 0 0 3px rgba(47,111,237,.12)",
+  borderColor: notion.accentBlue,
+  boxShadow: `0 0 0 1px ${notion.accentBlue}`,
 };
 
 export const INPUT_STYLE: React.CSSProperties = {
   width: "100%",
-  padding: "9px 12px",
-  border: "1px solid #e3e3df",
-  borderRadius: 8,
+  padding: "7px 10px",
+  border: `1px solid ${notion.borderStrong}`,
+  borderRadius: 4,
   fontSize: 14,
-  color: "#37352f",
+  color: notion.text,
   background: "#fff",
   outline: "none",
+  fontFamily: notion.font,
 };
 
 export const LABEL_STYLE: React.CSSProperties = {
   display: "block",
   fontSize: 12.5,
   fontWeight: 500,
-  color: "#5c5b57",
+  color: notion.textMuted,
   marginBottom: 6,
 };
 
 export const ERROR_STYLE: React.CSSProperties = {
   margin: "0 0 16px",
   fontSize: 13,
-  color: "#c0392b",
+  color: notion.danger,
 };
 
 export function Logo({ size = "lg" }: { size?: "lg" | "sm" }) {
   const lg = size === "lg";
   return (
     <div style={{ display: "flex", alignItems: "center", gap: lg ? 10 : 9, justifyContent: lg ? "center" : undefined }}>
+      {/* Kept your brand blue here on purpose — a product's mark is an
+          identity choice, not a "make it Notion" choice. Notion's own
+          logo is solid black/white, but that doesn't mean yours should be.
+          Swap the background below if you do want to match. */}
       <div
         style={{
           width: lg ? 34 : 26,
           height: lg ? 34 : 26,
-          borderRadius: lg ? 9 : 7,
+          borderRadius: lg ? 8 : 6,
           background: "#2f6fed",
           display: "flex",
           alignItems: "center",
@@ -106,7 +134,15 @@ export function Logo({ size = "lg" }: { size?: "lg" | "sm" }) {
       >
         IB
       </div>
-      <span style={{ fontSize: lg ? 19 : 15, fontWeight: 600, letterSpacing: lg ? "-.3px" : "-.2px" }}>
+      <span
+        style={{
+          fontSize: lg ? 19 : 15,
+          fontWeight: 700,
+          letterSpacing: lg ? "-.2px" : "-.1px",
+          color: notion.text,
+          fontFamily: notion.font,
+        }}
+      >
         Info Board
       </span>
     </div>
@@ -136,7 +172,7 @@ export function Modal({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(15,15,15,.42)",
+        background: "rgba(15,15,15,.36)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -150,11 +186,13 @@ export function Modal({
         style={{
           width: "100%",
           maxWidth,
-          background: "#fff",
-          borderRadius: 14,
+          background: notion.bgPage,
+          borderRadius: 8,
           padding: 24,
-          boxShadow: "0 12px 40px rgba(15,15,15,.18)",
+          border: `1px solid ${notion.border}`,
+          boxShadow: "0 4px 16px rgba(15,15,15,.12), 0 1px 3px rgba(15,15,15,.08)",
           animation: "ib-pop .16s ease",
+          fontFamily: notion.font,
         }}
       >
         {children}
