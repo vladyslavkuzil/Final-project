@@ -23,9 +23,13 @@ tf-destroy:
 dev:
 	docker compose --profile dev up --build
 
+dev-fresh:
+	docker compose --profile dev down -v
+	docker compose --profile dev up --build
+
 dev-detached:
 	docker compose --profile dev up --build -d
-	
+
 down:
 	docker compose --profile dev down
 
