@@ -79,9 +79,7 @@ def get_project_by_name_for_member(
     return project, membership.role
 
 
-def _create_project(
-    db: Session, name: str, description: str | None = None
-) -> Project:
+def _create_project(db: Session, name: str, description: str | None = None) -> Project:
     """Create a new project and return it refreshed from the database.
 
     Args:

@@ -253,11 +253,13 @@ class ProjectServiceUnitTests(unittest.TestCase):
     def test_leave_project_raises_when_owner_leaves(self):
         # Arrange
         project = SimpleProject()
-        owner_membership = SimpleNamespace(user_id="owner-id", role=MembershipRole.OWNER)
+        owner_membership = SimpleNamespace(
+            user_id="owner-id", role=MembershipRole.OWNER
+        )
 
         self.db.query.side_effect = [
-            make_query(project),            # db.query(Project)...one_or_none()
-            make_query(owner_membership),   # db.query(ProjectMembership)...one_or_none()
+            make_query(project),  # db.query(Project)...one_or_none()
+            make_query(owner_membership),  # db.query(ProjectMembership)...one_or_none()
         ]
 
         # Act / Assert — the owner is not allowed to leave their own project
@@ -349,7 +351,7 @@ class TestLeaveProjectEndpoint:
         )
         db.flush()
         return project
-    
+
     def test_participant_can_leave_returns_204(
         self, client: TestClient, db: Session, project_with_members: Project, auth_as
     ):
