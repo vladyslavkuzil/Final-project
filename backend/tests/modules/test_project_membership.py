@@ -390,10 +390,33 @@ class TestGetUsers(unittest.TestCase):
         return db
 
     def test_returns_users_wrapped_in_dict(self):
-        users = [make_user("u1"), make_user("u2")]
-        db = self._make_db_with_join_chain(users)
+        user1 = make_user("u1", "u1@test.com")
+        user2 = make_user("u2", "u2@test.com")
+        rows = [
+            (user1, MembershipRole.OWNER),
+            (user2, MembershipRole.PARTICIPANT),
+        ]
+        db = self._make_db_with_join_chain(rows)
         result = services.get_users(db, "proj-1")
-        self.assertEqual(result, {"users": users})
+        self.assertEqual(
+            result,
+            {
+                "users": [
+                    {
+                        "id": "u1",
+                        "email": "u1@test.com",
+                        "is_active": True,
+                        "role": MembershipRole.OWNER.value,
+                    },
+                    {
+                        "id": "u2",
+                        "email": "u2@test.com",
+                        "is_active": True,
+                        "role": MembershipRole.PARTICIPANT.value,
+                    },
+                ]
+            },
+        )
 
     def test_returns_empty_list_when_no_members(self):
         db = self._make_db_with_join_chain([])
