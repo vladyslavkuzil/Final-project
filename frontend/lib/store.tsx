@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { toast } from "sonner";
 import { api, ApiError, getMyEmail, getToken } from "./api";
 
 export type Role = "Admin" | "Member";
@@ -179,19 +178,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const createProject = async (name: string, desc: string) => {
     await api.post("/projects", { name, description: desc });
     await refresh();
-    toast.success("Project created");
   };
 
   const deleteProject = async (id: string) => {
     await api.del(`/project/${id}`);
     await refresh();
-    toast.success("Project deleted");
   };
 
   const leaveProject = async (id: string) => {
     await api.post(`/project/${id}/leave`);
     await refresh();
-    toast.success("Left project");
   };
 
   const loadProjectById = async (id: string) => {
@@ -273,31 +269,32 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       is_finished: patch.finished,
     });
     await refresh();
-    toast.success("Settings saved");
   };
 
   const generateJoinCode = async (projectId: string): Promise<string> => {
-    const data = await api.post<{ code: string }>(`/project/${projectId}/join-code`, {});
+    const data = await api.post<{ code: string }>(
+      `/project/${projectId}/join-code`,
+      {},
+    );
     return data.code;
   };
 
   const joinProject = async (code: string): Promise<string> => {
-    const data = await api.post<{ project_id: string }>(`/join/${encodeURIComponent(code)}`);
+    const data = await api.post<{ project_id: string }>(
+      `/join/${encodeURIComponent(code)}`,
+    );
     await refresh();
-    toast.success("Joined project");
     return data.project_id;
   };
 
   const removeMember = async (projectId: string, userId: string) => {
     await api.del(`/project/${projectId}/members/${userId}`);
     await refresh();
-    toast.success("Member removed");
   };
 
   const inviteByEmail = async (projectId: string, email: string) => {
     await api.post(`/project/${projectId}/invite`, { email });
     await refresh();
-    toast.success("Invite sent");
   };
 
   return (

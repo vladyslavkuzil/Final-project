@@ -11,8 +11,7 @@
   "dependencies": {
     "next": "16.2.6",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "sonner": "^2.0.7"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@types/node": "^20",

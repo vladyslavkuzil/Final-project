@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { toast } from "sonner";
 import type { Project } from "../../lib/store";
 import {
   ERROR_STYLE,
@@ -68,7 +67,6 @@ function useModalSubmit(
     } catch (e) {
       const msg = e instanceof Error ? e.message : fallback;
       setError(msg);
-      toast.error(msg);
     } finally {
       setBusy(false);
     }
@@ -547,7 +545,11 @@ export function ConfirmRemoveMemberModal({
   onClose: () => void;
   onConfirm: () => Promise<void>;
 }) {
-  const { error, busy, submit } = useModalSubmit(onConfirm, onClose, "Failed to remove member");
+  const { error, busy, submit } = useModalSubmit(
+    onConfirm,
+    onClose,
+    "Failed to remove member",
+  );
 
   return (
     <Modal maxWidth={400} onClose={onClose}>
@@ -561,7 +563,14 @@ export function ConfirmRemoveMemberModal({
       >
         Remove Member
       </h2>
-      <p style={{ margin: "0 0 22px", fontSize: 13.5, color: "#5c5b57", lineHeight: 1.5 }}>
+      <p
+        style={{
+          margin: "0 0 22px",
+          fontSize: 13.5,
+          color: "#5c5b57",
+          lineHeight: 1.5,
+        }}
+      >
         Are you sure you want to remove{" "}
         <strong style={{ color: "#37352f" }}>{email}</strong> from this project?
       </p>
