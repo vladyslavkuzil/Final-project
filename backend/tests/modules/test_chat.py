@@ -23,6 +23,7 @@ class DummyWebSocket:
 
 def _mock_query(result=None):
     query = Mock()
+    query.options.return_value = query
     query.filter.return_value = query
     query.order_by.return_value = query
     query.offset.return_value = query
@@ -199,6 +200,9 @@ def test_ws_message_in_validation_rejects_empty_payload():
 
 def test_project_chat_ws_broadcasts_message(client: TestClient):
     fake_db = Mock()
+    fake_db.query.return_value.filter.return_value.scalar.return_value = (
+        "user-1@example.com"
+    )
     fake_message = SimpleNamespace(
         id="msg-1",
         project_id="project-1",
@@ -231,3 +235,4 @@ def test_project_chat_ws_broadcasts_message(client: TestClient):
     assert data["content"] == "hello from websocket"
     assert data["project_id"] == "project-1"
     assert data["sender_id"] == "user-1"
+    assert data["sender_email"] == "user-1@example.com"

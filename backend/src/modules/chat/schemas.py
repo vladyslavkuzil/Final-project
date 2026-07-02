@@ -13,5 +13,6 @@ class WSMessageOut(BaseModel):
     id: str
     project_id: str
     sender_id: str
+    sender_email: str
     content: str
     created_at: str
