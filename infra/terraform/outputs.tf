@@ -87,3 +87,7 @@ output "alb_dns_name" {
   description = "Public DNS name of the Application Load Balancer — use this to reach the app"
   value       = module.alb.alb_dns_name
 }
+
+output "documents_bucket_name" {
+  value = aws_s3_bucket.documents.bucket
+}

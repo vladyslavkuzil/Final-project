@@ -79,3 +79,9 @@ variable "algorithm" {
   type    = string
   default = "HS256"
 }
+
+variable "s3_bucket_name" {
+  description = "Name of the S3 bucket for document uploads"
+  type        = string
+  default     = ""
+}

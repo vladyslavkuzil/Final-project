@@ -87,3 +87,8 @@ variable "frontend_target_group_arn" {
   description = "ARN of the ALB target group for the frontend service"
   type        = string
 }
+
+variable "s3_bucket_name" {
+  description = "S3 bucket name injected into the backend container"
+  type        = string
+}

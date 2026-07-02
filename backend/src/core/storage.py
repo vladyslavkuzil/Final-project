@@ -6,13 +6,16 @@ implementation. Swapping to S3 later means adding an ``S3StorageBackend`` and
 changing the binding in ``get_storage`` — nothing else in the app changes.
 """
 
+import asyncio
 import uuid
 from pathlib import Path
 from typing import AsyncIterator, Protocol, runtime_checkable
 
+import boto3
+from botocore.exceptions import ClientError
 from fastapi import UploadFile
 
-from src.core.config import UPLOAD_DIR
+from src.core.config import UPLOAD_DIR, S3_BUCKET_NAME
 
 _CHUNK_SIZE = 1024 * 1024
 
@@ -80,10 +83,57 @@ class LocalStorageBackend:
         return full
 
 
+class S3StorageBackend:
+    """Stores files in an AWS S3 bucket."""
+
+    def __init__(self, bucket: str) -> None:
+        self.bucket = bucket
+        self._s3 = boto3.client("s3")
+
+    async def save(self, file: UploadFile) -> str:
+        ext = Path(file.filename or "").suffix
+        key = f"{uuid.uuid4().hex}{ext}"
+        body = await file.read()
+        await asyncio.to_thread(
+            self._s3.put_object, Bucket=self.bucket, Key=key, Body=body
+        )
+        return key
+
+    async def get(self, path: str) -> AsyncIterator[bytes]:
+        try:
+            obj = await asyncio.to_thread(
+                self._s3.get_object, Bucket=self.bucket, Key=path
+            )
+        except ClientError as e:
+            if e.response["Error"]["Code"] == "NoSuchKey":
+                raise FileNotFoundError(path)
+            raise
+        stream = obj["Body"]
+        try:
+            while chunk := await asyncio.to_thread(stream.read, _CHUNK_SIZE):
+                yield chunk
+        finally:
+            stream.close()
+
+    def exists(self, path: str) -> bool:
+        try:
+            self._s3.head_object(Bucket=self.bucket, Key=path)
+            return True
+        except ClientError as e:
+            if e.response["Error"]["Code"] in ("404", "NoSuchKey"):
+                return False
+            raise
+
+    def delete(self, path: str) -> None:
+        self._s3.delete_object(Bucket=self.bucket, Key=path)
+
+
 def get_storage() -> StorageBackend:
     """FastAPI dependency that provides the active storage backend.
 
-    Swap the returned implementation (e.g. ``S3StorageBackend``) to change
-    where documents are stored.
+    Uses ``S3StorageBackend`` when ``S3_BUCKET_NAME`` is set, otherwise falls
+    back to ``LocalStorageBackend`` for local development.
     """
+    if S3_BUCKET_NAME:
+        return S3StorageBackend(S3_BUCKET_NAME)
     return LocalStorageBackend(UPLOAD_DIR)
