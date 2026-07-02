@@ -184,3 +184,93 @@ resource "aws_s3_bucket_public_access_block" "documents" {
   ignore_public_acls      = true
   restrict_public_buckets = true
 }
+
+# ─── LAMBDA: IMAGE RESIZE ───────────────────────────────────────────────────
+
+data "archive_file" "image_resize_zip" {
+  type        = "zip"
+  source_dir  = "${path.module}/../../lambda/image_resize/build"
+  output_path = "${path.module}/.terraform-build/image_resize.zip"
+}
+
+resource "aws_iam_role" "image_resize_lambda" {
+  name = "${var.project_name}-image-resize-lambda"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "image_resize_basic" {
+  role       = aws_iam_role.image_resize_lambda.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_iam_role_policy" "image_resize_s3" {
+  name = "${var.project_name}-image-resize-s3"
+  role = aws_iam_role.image_resize_lambda.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject"
+        ]
+        Resource = [
+          "${aws_s3_bucket.documents.arn}/original/*",
+          "${aws_s3_bucket.documents.arn}/resized/*"
+        ]
+      }
+    ]
+  })
+}
+
+resource "aws_lambda_function" "image_resize" {
+  function_name = "${var.project_name}-image-resize"
+  role          = aws_iam_role.image_resize_lambda.arn
+  handler       = "handler.lambda_handler"
+  runtime       = "python3.12"
+  timeout       = 30
+  memory_size   = 512
+
+  filename         = data.archive_file.image_resize_zip.output_path
+  source_code_hash = data.archive_file.image_resize_zip.output_base64sha256
+
+  environment {
+    variables = {
+      TARGET_WIDTH = "1024"
+    }
+  }
+}
+
+resource "aws_lambda_permission" "allow_s3_invoke_image_resize" {
+  statement_id  = "AllowS3InvokeImageResize"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.image_resize.function_name
+  principal     = "s3.amazonaws.com"
+  source_arn    = aws_s3_bucket.documents.arn
+}
+
+resource "aws_s3_bucket_notification" "documents_resize" {
+  bucket = aws_s3_bucket.documents.id
+
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.image_resize.arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "original/"
+  }
+
+  depends_on = [aws_lambda_permission.allow_s3_invoke_image_resize]
+}
