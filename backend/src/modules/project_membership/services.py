@@ -187,17 +187,28 @@ def invite_user_by_email(db: Session, project_id: str, email: str):
 
 
 def get_users(db: Session, project_id: str):
-    """Return all members of a project.
+    """Return all members of a project including their role.
 
-    Returns a dict with a 'users' key containing a list of User ORM instances.
+    Returns a dict with a 'users' key containing dicts with id, email,
+    is_active, and role fields.
     """
-    users = (
-        db.query(User)
+    rows = (
+        db.query(User, ProjectMembership.role)
         .join(ProjectMembership, ProjectMembership.user_id == User.id)
         .filter(ProjectMembership.project_id == project_id)
         .all()
     )
-    return {"users": users}
+    return {
+        "users": [
+            {
+                "id": user.id,
+                "email": user.email,
+                "is_active": user.is_active,
+                "role": role.value,
+            }
+            for user, role in rows
+        ]
+    }
 
 
 def remove_user(db: Session, project_id: str, user_id: str, caller_id: str):

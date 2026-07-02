@@ -199,9 +199,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   };
 
   const loadProjectDocuments = async (projectId: string) => {
-    const docs = await api.get<ApiDocument[]>(
-      `/project/${projectId}/documents`,
-    );
+    const [docs, membersData] = await Promise.all([
+      api.get<ApiDocument[]>(`/project/${projectId}/documents`),
+      api.get<{ users: { id: string; email: string }[] }>(
+        `/project/${projectId}/members`,
+      ),
+    ]);
+    const emailMap: Record<string, string> = {};
+    for (const u of membersData.users) {
+      emailMap[u.id] = u.email;
+    }
+    setUserEmails(emailMap);
     const files: FileItem[] = docs.map((d) => {
       const { ext, color } = fileMeta(d.file_path || d.title);
       return {
@@ -210,7 +218,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         ext,
         color,
         size: "—",
-        by: userEmails[d.uploaded_by] ?? d.uploaded_by,
+        by: emailMap[d.uploaded_by] ?? d.uploaded_by,
         date: formatDate(d.created_at),
       };
     });

@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { ProjectChatPanel } from "../../components/chat/project-chat";
 import { Hov } from "../../components/infoboard/ui";
-import { InviteModal, SettingsModal, ConfirmRemoveMemberModal } from "../../components/infoboard/modals";
+import {
+  InviteModal,
+  SettingsModal,
+  ConfirmRemoveMemberModal,
+} from "../../components/infoboard/modals";
 import { useStore, type FileItem, type Role } from "../../lib/store";
 import { api, getToken } from "../../lib/api";
 
@@ -45,25 +49,42 @@ export default function ProjectDashboard() {
   } = useStore();
 
   const id = typeof router.query.id === "string" ? router.query.id : "";
-  const rawTab = typeof router.query.tab === "string" ? router.query.tab : "files";
-  const tab: "files" | "members" | "chat" = ["files", "members", "chat"].includes(rawTab)
+  const rawTab =
+    typeof router.query.tab === "string" ? router.query.tab : "files";
+  const tab: "files" | "members" | "chat" = [
+    "files",
+    "members",
+    "chat",
+  ].includes(rawTab)
     ? (rawTab as "files" | "members" | "chat")
     : "files";
   const setTab = (t: "files" | "members" | "chat") =>
-    router.push({ pathname: router.pathname, query: { ...router.query, tab: t } }, undefined, { shallow: true });
+    router.push(
+      { pathname: router.pathname, query: { ...router.query, tab: t } },
+      undefined,
+      { shallow: true },
+    );
   const project = projects.find((p) => p.id === id);
   const [modal, setModal] = useState<"invite" | "settings" | null>(null);
-  const [memberToRemove, setMemberToRemove] = useState<{ id: string; email: string } | null>(null);
+  const [memberToRemove, setMemberToRemove] = useState<{
+    id: string;
+    email: string;
+  } | null>(null);
   const [liveMembers, setLiveMembers] = useState<
-    { id: string; email: string; is_active: boolean }[]
+    { id: string; email: string; is_active: boolean; role: string }[]
   >([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchMembers = (projectId: string) =>
     api
-      .get<{ users: { id: string; email: string; is_active: boolean }[] }>(
-        `/project/${projectId}/members`,
-      )
+      .get<{
+        users: {
+          id: string;
+          email: string;
+          is_active: boolean;
+          role: string;
+        }[];
+      }>(`/project/${projectId}/members`)
       .then((data) => setLiveMembers(data.users))
       .catch(() => {});
 
@@ -686,122 +707,139 @@ export default function ProjectDashboard() {
                   overflow: "hidden",
                 }}
               >
-                {[...liveMembers].sort((a, b) => {
+                {[...liveMembers]
+                  .sort((a, b) => {
                     if (a.email === me && project.myRole === "Admin") return -1;
                     if (b.email === me && project.myRole === "Admin") return 1;
                     return 0;
-                  }).map((m) => {
-                  const role: Role = m.email === me && project.myRole === "Admin" ? "Admin" : "Member";
-                  return (
-                  <div
-                    key={m.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "14px 18px",
-                      borderBottom: "1px solid #f3f3f1",
-                    }}
-                  >
-                    <div
-                      style={{ display: "flex", alignItems: "center", gap: 11 }}
-                    >
+                  })
+                  .map((m) => {
+                    const role: Role = m.role === "owner" ? "Admin" : "Member";
+                    return (
                       <div
-                        style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: "50%",
-                          background: "#dce8fd",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: 14,
-                          fontWeight: 700,
-                          color: "#2f6fed",
-                          flexShrink: 0,
-                        }}
-                      >
-                        {initialOf(m.email)}
-                      </div>
-                      <span style={{ fontSize: 13.5, fontWeight: 500 }}>
-                        {m.email}
-                      </span>
-                    </div>
-                    <div
-                      style={{ display: "flex", alignItems: "center", gap: 14 }}
-                    >
-                      {role !== "Admin" && (
-                      <div
+                        key={m.id}
                         style={{
                           display: "flex",
                           alignItems: "center",
-                          gap: 6,
+                          justifyContent: "space-between",
+                          padding: "14px 18px",
+                          borderBottom: "1px solid #f3f3f1",
                         }}
                       >
-                        <span
+                        <div
                           style={{
-                            width: 7,
-                            height: 7,
-                            borderRadius: "50%",
-                            background: m.is_active ? "#22a559" : "#d0a02b",
-                            display: "inline-block",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 11,
                           }}
-                        />
-                        <span style={{ fontSize: 12, color: "#9b9a93" }}>
-                          {m.is_active ? "Active" : "Pending"}
-                        </span>
+                        >
+                          <div
+                            style={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: "50%",
+                              background: "#dce8fd",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontSize: 14,
+                              fontWeight: 700,
+                              color: "#2f6fed",
+                              flexShrink: 0,
+                            }}
+                          >
+                            {initialOf(m.email)}
+                          </div>
+                          <span style={{ fontSize: 13.5, fontWeight: 500 }}>
+                            {m.email}
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 14,
+                          }}
+                        >
+                          {role !== "Admin" && (
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 6,
+                              }}
+                            >
+                              <span
+                                style={{
+                                  width: 7,
+                                  height: 7,
+                                  borderRadius: "50%",
+                                  background: m.is_active
+                                    ? "#22a559"
+                                    : "#d0a02b",
+                                  display: "inline-block",
+                                }}
+                              />
+                              <span style={{ fontSize: 12, color: "#9b9a93" }}>
+                                {m.is_active ? "Active" : "Pending"}
+                              </span>
+                            </div>
+                          )}
+                          {role === "Admin" ? (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 600,
+                                color: "#1a56db",
+                                background: "#e8f0fe",
+                                padding: "3px 9px",
+                                borderRadius: 20,
+                              }}
+                            >
+                              Admin
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 600,
+                                color: "#6b6b67",
+                                background: "#f0f0ee",
+                                padding: "3px 9px",
+                                borderRadius: 20,
+                              }}
+                            >
+                              Member
+                            </span>
+                          )}
+                          {isAdmin && role !== "Admin" && m.email !== me && (
+                            <Hov
+                              as="button"
+                              onClick={() =>
+                                setMemberToRemove({ id: m.id, email: m.email })
+                              }
+                              style={{
+                                background: "none",
+                                border: "1px solid #e3e3df",
+                                borderRadius: 6,
+                                padding: "4px 8px",
+                                cursor: "pointer",
+                                fontSize: 12,
+                                color: "#c0392b",
+                                lineHeight: 1,
+                              }}
+                              hoverStyle={{
+                                background: "#fff0ee",
+                                borderColor: "#c0392b",
+                              }}
+                            >
+                              Remove
+                            </Hov>
+                          )}
+                        </div>
                       </div>
-                      )}
-                      {role === "Admin" ? (
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: "#1a56db",
-                            background: "#e8f0fe",
-                            padding: "3px 9px",
-                            borderRadius: 20,
-                          }}
-                        >
-                          Admin
-                        </span>
-                      ) : (
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: "#6b6b67",
-                            background: "#f0f0ee",
-                            padding: "3px 9px",
-                            borderRadius: 20,
-                          }}
-                        >
-                          Member
-                        </span>
-                      )}
-                      {isAdmin && role !== "Admin" && m.email !== me && (
-                        <Hov
-                          as="button"
-                          onClick={() => setMemberToRemove({ id: m.id, email: m.email })}
-                          style={{
-                            background: "none",
-                            border: "1px solid #e3e3df",
-                            borderRadius: 6,
-                            padding: "4px 8px",
-                            cursor: "pointer",
-                            fontSize: 12,
-                            color: "#c0392b",
-                            lineHeight: 1,
-                          }}
-                          hoverStyle={{ background: "#fff0ee", borderColor: "#c0392b" }}
-                        >
-                          Remove
-                        </Hov>
-                      )}
-                    </div>
-                  </div>
-                  );
-                })}
+                    );
+                  })}
               </div>
             </main>
           )}
@@ -820,7 +858,7 @@ export default function ProjectDashboard() {
           onClose={() => setModal(null)}
           onSend={async (email) => {
             await inviteByEmail(project.id, email);
-            fetchMembers(project.id);
+            await fetchMembers(project.id);
           }}
           onGenerateCode={() => generateJoinCode(project.id)}
         />
@@ -838,7 +876,9 @@ export default function ProjectDashboard() {
           onClose={() => setMemberToRemove(null)}
           onConfirm={async () => {
             await removeMember(project.id, memberToRemove.id);
-            setLiveMembers((prev) => prev.filter((m) => m.id !== memberToRemove.id));
+            setLiveMembers((prev) =>
+              prev.filter((m) => m.id !== memberToRemove.id),
+            );
           }}
         />
       )}
