@@ -6,6 +6,8 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from types import SimpleNamespace
+
 from src.core.enums import MembershipRole
 from src.modules.auth.models import User
 from src.modules.project_membership.models import ProjectMembership
@@ -166,7 +168,6 @@ class ProjectServiceUnitTests(unittest.TestCase):
 
         self.assertEqual(project.name, "project-1")
         self.assertEqual(project.description, "a project")
-        self.assertEqual(project.admin_id, "admin-id")
         self.assertEqual(project.user_role, MembershipRole.OWNER)
         self.db.commit.assert_called_once()
         self.db.refresh.assert_called_once_with(project)
@@ -250,9 +251,14 @@ class ProjectServiceUnitTests(unittest.TestCase):
             services.leave_project(self.db, "missing-id", "user-2")
 
     def test_leave_project_raises_when_owner_leaves(self):
-        # Arrange — a project whose owner is the user trying to leave
-        project = SimpleProject(admin_id="owner-id")
-        self.db.query.return_value = make_query(project)
+        # Arrange
+        project = SimpleProject()
+        owner_membership = SimpleNamespace(user_id="owner-id", role=MembershipRole.OWNER)
+
+        self.db.query.side_effect = [
+            make_query(project),            # db.query(Project)...one_or_none()
+            make_query(owner_membership),   # db.query(ProjectMembership)...one_or_none()
+        ]
 
         # Act / Assert — the owner is not allowed to leave their own project
         with self.assertRaises(OwnerCannotLeaveError):
@@ -326,7 +332,7 @@ class TestLeaveProjectEndpoint:
         )
         db.add_all([owner, participant])
         db.flush()
-        project = Project(name="leave-endpoint-project", admin_id=owner.id)
+        project = Project(name="leave-endpoint-project")
         db.add(project)
         db.flush()
         db.add_all(
@@ -343,7 +349,7 @@ class TestLeaveProjectEndpoint:
         )
         db.flush()
         return project
-
+    
     def test_participant_can_leave_returns_204(
         self, client: TestClient, db: Session, project_with_members: Project, auth_as
     ):
