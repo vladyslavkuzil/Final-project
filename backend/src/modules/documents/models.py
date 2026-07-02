@@ -16,7 +16,7 @@ class Document(Base):
     project_id: Mapped[str] = mapped_column(
         ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
     )
-    uploaded_by: Mapped[str] = mapped_column(String, nullable=False)
+    uploaded_by: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
