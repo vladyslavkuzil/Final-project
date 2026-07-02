@@ -2,9 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { ProjectChatPanel } from "../../components/chat/project-chat";
 import { Hov } from "../../components/infoboard/ui";
-import { InviteModal, SettingsModal } from "../../components/infoboard/modals";
-import { useStore, type FileItem } from "../../lib/store";
-import { getToken } from "../../lib/api";
+import {
+  InviteModal,
+  SettingsModal,
+  ConfirmRemoveMemberModal,
+} from "../../components/infoboard/modals";
+import { useStore, type FileItem, type Role } from "../../lib/store";
+import { api, getToken } from "../../lib/api";
 
 const initialOf = (email: string) => (email || "?").charAt(0).toUpperCase();
 
@@ -27,10 +31,12 @@ function navStyle(active: boolean): React.CSSProperties {
 export default function ProjectDashboard() {
   const router = useRouter();
   const {
+    me,
     projects,
     loaded,
     deleteProject,
     leaveProject,
+    loadProjectById,
     loadProjectDocuments,
     deleteFile,
     renameFile,
@@ -38,14 +44,49 @@ export default function ProjectDashboard() {
     downloadFile,
     saveSettings,
     inviteByEmail,
+    generateJoinCode,
+    removeMember,
   } = useStore();
 
   const id = typeof router.query.id === "string" ? router.query.id : "";
+  const rawTab =
+    typeof router.query.tab === "string" ? router.query.tab : "files";
+  const tab: "files" | "members" | "chat" = [
+    "files",
+    "members",
+    "chat",
+  ].includes(rawTab)
+    ? (rawTab as "files" | "members" | "chat")
+    : "files";
+  const setTab = (t: "files" | "members" | "chat") =>
+    router.push(
+      { pathname: router.pathname, query: { ...router.query, tab: t } },
+      undefined,
+      { shallow: true },
+    );
   const project = projects.find((p) => p.id === id);
-
-  const [tab, setTab] = useState<"files" | "members" | "chat">("files");
   const [modal, setModal] = useState<"invite" | "settings" | null>(null);
+  const [memberToRemove, setMemberToRemove] = useState<{
+    id: string;
+    email: string;
+  } | null>(null);
+  const [liveMembers, setLiveMembers] = useState<
+    { id: string; email: string; is_active: boolean; role: string }[]
+  >([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchMembers = (projectId: string) =>
+    api
+      .get<{
+        users: {
+          id: string;
+          email: string;
+          is_active: boolean;
+          role: string;
+        }[];
+      }>(`/project/${projectId}/members`)
+      .then((data) => setLiveMembers(data.users))
+      .catch(() => {});
 
   useEffect(() => {
     if (!getToken()) router.replace("/login");
@@ -61,6 +102,20 @@ export default function ProjectDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, !!project]);
 
+  // Fetch full project info (including the caller's role) from the detail endpoint.
+  useEffect(() => {
+    if (id) loadProjectById(id).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  // Refresh live members whenever the members tab is opened.
+  useEffect(() => {
+    if (tab === "members" && id) {
+      fetchMembers(id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, id]);
+
   if (!project) return null;
 
   const isAdmin = project.myRole === "Admin";
@@ -68,7 +123,10 @@ export default function ProjectDashboard() {
 
   // Run an async action, surfacing any failure as an alert. Returns whether it
   // succeeded so callers can navigate only on success.
-  const runOrAlert = async (fn: () => Promise<void>, fallback: string): Promise<boolean> => {
+  const runOrAlert = async (
+    fn: () => Promise<void>,
+    fallback: string,
+  ): Promise<boolean> => {
     try {
       await fn();
       return true;
@@ -79,15 +137,33 @@ export default function ProjectDashboard() {
   };
 
   const onDeleteProject = async () => {
-    if (!window.confirm('Delete "' + project.name + '"? This cannot be undone.')) return;
-    if (await runOrAlert(() => deleteProject(project.id), "Failed to delete project")) {
+    if (
+      !window.confirm('Delete "' + project.name + '"? This cannot be undone.')
+    )
+      return;
+    if (
+      await runOrAlert(
+        () => deleteProject(project.id),
+        "Failed to delete project",
+      )
+    ) {
       router.push("/projects");
     }
   };
 
   const onLeaveProject = async () => {
-    if (!window.confirm('Leave "' + project.name + '"? You will lose access to its files.')) return;
-    if (await runOrAlert(() => leaveProject(project.id), "Failed to leave project")) {
+    if (
+      !window.confirm(
+        'Leave "' + project.name + '"? You will lose access to its files.',
+      )
+    )
+      return;
+    if (
+      await runOrAlert(
+        () => leaveProject(project.id),
+        "Failed to leave project",
+      )
+    ) {
       router.push("/projects");
     }
   };
@@ -95,14 +171,20 @@ export default function ProjectDashboard() {
   const onRename = async (f: FileItem) => {
     const next = window.prompt("Rename document", f.name);
     if (!next || next === f.name) return;
-    await runOrAlert(() => renameFile(project.id, f.id, next), "Failed to rename document");
+    await runOrAlert(
+      () => renameFile(project.id, f.id, next),
+      "Failed to rename document",
+    );
   };
 
   const onDelete = (f: FileItem) =>
     runOrAlert(() => deleteFile(project.id, f.id), "Failed to delete document");
 
   const onDownload = (f: FileItem) =>
-    runOrAlert(() => downloadFile(project.id, f.id, f.name), "Failed to download document");
+    runOrAlert(
+      () => downloadFile(project.id, f.id, f.name),
+      "Failed to download document",
+    );
 
   const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -112,7 +194,7 @@ export default function ProjectDashboard() {
     if (title === null) return;
     await runOrAlert(
       () => uploadFile(project.id, file, title.trim() || file.name),
-      "Failed to upload document"
+      "Failed to upload document",
     );
   };
 
@@ -191,17 +273,44 @@ export default function ProjectDashboard() {
             >
               {projInitial}
             </div>
-            <span style={{ fontSize: 14.5, fontWeight: 600, letterSpacing: "-.2px", lineHeight: 1.2 }}>
+            <span
+              style={{
+                fontSize: 14.5,
+                fontWeight: 600,
+                letterSpacing: "-.2px",
+                lineHeight: 1.2,
+              }}
+            >
               {project.name}
             </span>
           </div>
 
           <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <Hov as="a" onClick={() => setTab("files")} style={navStyle(tab === "files")} hoverStyle={{ background: "#efefec" }}>
-              <span style={{ display: "flex", width: 16, justifyContent: "center" }}>▤</span>Files
+            <Hov
+              as="a"
+              onClick={() => setTab("files")}
+              style={navStyle(tab === "files")}
+              hoverStyle={{ background: "#efefec" }}
+            >
+              <span
+                style={{ display: "flex", width: 16, justifyContent: "center" }}
+              >
+                ▤
+              </span>
+              Files
             </Hov>
-            <Hov as="a" onClick={() => setTab("chat")} style={navStyle(tab === "chat")} hoverStyle={{ background: "#efefec" }}>
-              <span style={{ display: "flex", width: 16, justifyContent: "center" }}>💬</span>Chat
+            <Hov
+              as="a"
+              onClick={() => setTab("chat")}
+              style={navStyle(tab === "chat")}
+              hoverStyle={{ background: "#efefec" }}
+            >
+              <span
+                style={{ display: "flex", width: 16, justifyContent: "center" }}
+              >
+                💬
+              </span>
+              Chat
             </Hov>
             <Hov
               as="a"
@@ -209,7 +318,12 @@ export default function ProjectDashboard() {
               style={navStyle(tab === "members")}
               hoverStyle={{ background: "#efefec" }}
             >
-              <span style={{ display: "flex", width: 16, justifyContent: "center" }}>◍</span>Members
+              <span
+                style={{ display: "flex", width: 16, justifyContent: "center" }}
+              >
+                ◍
+              </span>
+              Members
             </Hov>
             {isAdmin && (
               <Hov
@@ -229,7 +343,16 @@ export default function ProjectDashboard() {
                 }}
                 hoverStyle={{ background: "#efefec" }}
               >
-                <span style={{ display: "flex", width: 16, justifyContent: "center" }}>⚙</span>Project Settings
+                <span
+                  style={{
+                    display: "flex",
+                    width: 16,
+                    justifyContent: "center",
+                  }}
+                >
+                  ⚙
+                </span>
+                Project Settings
               </Hov>
             )}
           </nav>
@@ -282,18 +405,48 @@ export default function ProjectDashboard() {
                 }}
                 hoverStyle={{ background: "#fdf2f1", borderColor: "#e8b9b3" }}
               >
-                <span style={{ fontSize: 14, lineHeight: 1 }}>⏻</span>Leave Project
+                <span style={{ fontSize: 14, lineHeight: 1 }}>⏻</span>Leave
+                Project
               </Hov>
             </div>
           )}
         </aside>
 
         {/* Main */}
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
           {tab === "files" && (
-            <main style={{ padding: "30px 36px 90px", maxWidth: 980, width: "100%" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22 }}>
-                <h1 style={{ margin: 0, fontSize: 21, fontWeight: 600, letterSpacing: "-.4px" }}>Files</h1>
+            <main
+              style={{
+                padding: "30px 36px 90px",
+                maxWidth: 980,
+                width: "100%",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: 22,
+                }}
+              >
+                <h1
+                  style={{
+                    margin: 0,
+                    fontSize: 21,
+                    fontWeight: 600,
+                    letterSpacing: "-.4px",
+                  }}
+                >
+                  Files
+                </h1>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -319,12 +472,20 @@ export default function ProjectDashboard() {
                   }}
                   hoverStyle={{ background: "#2560d8" }}
                 >
-                  <span style={{ fontSize: 14, marginTop: -1 }}>↑</span>Upload Document
+                  <span style={{ fontSize: 14, marginTop: -1 }}>↑</span>Upload
+                  Document
                 </Hov>
               </div>
 
               {project.files.length > 0 ? (
-                <div style={{ background: "#fff", border: "1px solid #ebebe8", borderRadius: 12, overflow: "hidden" }}>
+                <div
+                  style={{
+                    background: "#fff",
+                    border: "1px solid #ebebe8",
+                    borderRadius: 12,
+                    overflow: "hidden",
+                  }}
+                >
                   <div
                     style={{
                       display: "grid",
@@ -359,7 +520,14 @@ export default function ProjectDashboard() {
                       }}
                       hoverStyle={{ background: "#fafaf9" }}
                     >
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          minWidth: 0,
+                        }}
+                      >
                         <span
                           style={{
                             flexShrink: 0,
@@ -389,18 +557,32 @@ export default function ProjectDashboard() {
                       </div>
                       <span style={{ color: "#8b8a83" }}>{f.size}</span>
                       <span
-                        style={{ color: "#8b8a83", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                        style={{
+                          color: "#8b8a83",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
                       >
                         {f.by}
                       </span>
                       <span style={{ color: "#8b8a83" }}>{f.date}</span>
-                      <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 4,
+                          justifyContent: "flex-end",
+                        }}
+                      >
                         <Hov
                           as="button"
                           title="Download"
                           onClick={() => onDownload(f)}
                           style={{ ...iconBtn, color: "#6b6b67", fontSize: 13 }}
-                          hoverStyle={{ background: "#f4f4f2", color: "#37352f" }}
+                          hoverStyle={{
+                            background: "#f4f4f2",
+                            color: "#37352f",
+                          }}
                         >
                           ↓
                         </Hov>
@@ -409,7 +591,10 @@ export default function ProjectDashboard() {
                           title="Rename"
                           onClick={() => onRename(f)}
                           style={{ ...iconBtn, color: "#6b6b67", fontSize: 12 }}
-                          hoverStyle={{ background: "#f4f4f2", color: "#37352f" }}
+                          hoverStyle={{
+                            background: "#f4f4f2",
+                            color: "#37352f",
+                          }}
                         >
                           ✎
                         </Hov>
@@ -418,8 +603,15 @@ export default function ProjectDashboard() {
                             as="button"
                             title="Delete"
                             onClick={() => onDelete(f)}
-                            style={{ ...iconBtn, color: "#c0392b", fontSize: 12 }}
-                            hoverStyle={{ background: "#fdf2f1", borderColor: "#e8b9b3" }}
+                            style={{
+                              ...iconBtn,
+                              color: "#c0392b",
+                              fontSize: 12,
+                            }}
+                            hoverStyle={{
+                              background: "#fdf2f1",
+                              borderColor: "#e8b9b3",
+                            }}
                           >
                             🗑
                           </Hov>
@@ -449,16 +641,40 @@ export default function ProjectDashboard() {
                         "repeating-linear-gradient(45deg,#f4f4f2,#f4f4f2 8px,#efefec 8px,#efefec 16px)",
                     }}
                   />
-                  <p style={{ margin: 0, fontSize: 14, color: "#8b8a83" }}>No files yet. Upload the first one.</p>
+                  <p style={{ margin: 0, fontSize: 14, color: "#8b8a83" }}>
+                    No files yet. Upload the first one.
+                  </p>
                 </div>
               )}
             </main>
           )}
 
           {tab === "members" && (
-            <main style={{ padding: "30px 36px 90px", maxWidth: 760, width: "100%" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22 }}>
-                <h1 style={{ margin: 0, fontSize: 21, fontWeight: 600, letterSpacing: "-.4px" }}>Members</h1>
+            <main
+              style={{
+                padding: "30px 36px 90px",
+                maxWidth: 760,
+                width: "100%",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: 22,
+                }}
+              >
+                <h1
+                  style={{
+                    margin: 0,
+                    fontSize: 21,
+                    fontWeight: 600,
+                    letterSpacing: "-.4px",
+                  }}
+                >
+                  Members
+                </h1>
                 {isAdmin && (
                   <Hov
                     as="button"
@@ -478,96 +694,173 @@ export default function ProjectDashboard() {
                     }}
                     hoverStyle={{ background: "#2560d8" }}
                   >
-                    <span style={{ fontSize: 15, marginTop: -1 }}>+</span>Invite User
+                    <span style={{ fontSize: 15, marginTop: -1 }}>+</span>Invite
+                    User
                   </Hov>
                 )}
               </div>
-              <div style={{ background: "#fff", border: "1px solid #ebebe8", borderRadius: 12, overflow: "hidden" }}>
-                {project.members.map((m, i) => (
-                  <div
-                    key={m.email + i}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "14px 18px",
-                      borderBottom: "1px solid #f3f3f1",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+              <div
+                style={{
+                  background: "#fff",
+                  border: "1px solid #ebebe8",
+                  borderRadius: 12,
+                  overflow: "hidden",
+                }}
+              >
+                {[...liveMembers]
+                  .sort((a, b) => {
+                    if (a.email === me && project.myRole === "Admin") return -1;
+                    if (b.email === me && project.myRole === "Admin") return 1;
+                    return 0;
+                  })
+                  .map((m) => {
+                    const role: Role = m.role === "owner" ? "Admin" : "Member";
+                    return (
                       <div
+                        key={m.id}
                         style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: "50%",
-                          background: "#eef0f4",
                           display: "flex",
                           alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: "#5c5b57",
+                          justifyContent: "space-between",
+                          padding: "14px 18px",
+                          borderBottom: "1px solid #f3f3f1",
                         }}
                       >
-                        {initialOf(m.email)}
-                      </div>
-                      <span style={{ fontSize: 13.5, fontWeight: 500 }}>{m.email}</span>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <span
+                        <div
                           style={{
-                            width: 7,
-                            height: 7,
-                            borderRadius: "50%",
-                            background: m.active ? "#22a559" : "#d0a02b",
-                            display: "inline-block",
-                          }}
-                        />
-                        <span style={{ fontSize: 12, color: "#9b9a93" }}>{m.active ? "Active" : "Pending"}</span>
-                      </div>
-                      {m.role === "Admin" ? (
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: "#1a56db",
-                            background: "#e8f0fe",
-                            padding: "3px 9px",
-                            borderRadius: 20,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 11,
                           }}
                         >
-                          Admin
-                        </span>
-                      ) : (
-                        <span
+                          <div
+                            style={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: "50%",
+                              background: "#dce8fd",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontSize: 14,
+                              fontWeight: 700,
+                              color: "#2f6fed",
+                              flexShrink: 0,
+                            }}
+                          >
+                            {initialOf(m.email)}
+                          </div>
+                          <span style={{ fontSize: 13.5, fontWeight: 500 }}>
+                            {m.email}
+                          </span>
+                        </div>
+                        <div
                           style={{
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: "#6b6b67",
-                            background: "#f0f0ee",
-                            padding: "3px 9px",
-                            borderRadius: 20,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 14,
                           }}
                         >
-                          Member
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                          {role !== "Admin" && (
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 6,
+                              }}
+                            >
+                              <span
+                                style={{
+                                  width: 7,
+                                  height: 7,
+                                  borderRadius: "50%",
+                                  background: m.is_active
+                                    ? "#22a559"
+                                    : "#d0a02b",
+                                  display: "inline-block",
+                                }}
+                              />
+                              <span style={{ fontSize: 12, color: "#9b9a93" }}>
+                                {m.is_active ? "Active" : "Pending"}
+                              </span>
+                            </div>
+                          )}
+                          {role === "Admin" ? (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 600,
+                                color: "#1a56db",
+                                background: "#e8f0fe",
+                                padding: "3px 9px",
+                                borderRadius: 20,
+                              }}
+                            >
+                              Admin
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 600,
+                                color: "#6b6b67",
+                                background: "#f0f0ee",
+                                padding: "3px 9px",
+                                borderRadius: 20,
+                              }}
+                            >
+                              Member
+                            </span>
+                          )}
+                          {isAdmin && role !== "Admin" && m.email !== me && (
+                            <Hov
+                              as="button"
+                              onClick={() =>
+                                setMemberToRemove({ id: m.id, email: m.email })
+                              }
+                              style={{
+                                background: "none",
+                                border: "1px solid #e3e3df",
+                                borderRadius: 6,
+                                padding: "4px 8px",
+                                cursor: "pointer",
+                                fontSize: 12,
+                                color: "#c0392b",
+                                lineHeight: 1,
+                              }}
+                              hoverStyle={{
+                                background: "#fff0ee",
+                                borderColor: "#c0392b",
+                              }}
+                            >
+                              Remove
+                            </Hov>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
               </div>
             </main>
           )}
 
-          {tab === "chat" && <ProjectChatPanel projectId={project.id} projectName={project.name} />}
+          {tab === "chat" && (
+            <ProjectChatPanel
+              projectId={project.id}
+              projectName={project.name}
+            />
+          )}
         </div>
       </div>
 
       {modal === "invite" && (
         <InviteModal
           onClose={() => setModal(null)}
-          onSend={(email) => inviteByEmail(project.id, email)}
+          onSend={async (email) => {
+            await inviteByEmail(project.id, email);
+            await fetchMembers(project.id);
+          }}
+          onGenerateCode={() => generateJoinCode(project.id)}
         />
       )}
       {modal === "settings" && (
@@ -575,6 +868,18 @@ export default function ProjectDashboard() {
           project={project}
           onClose={() => setModal(null)}
           onSave={(patch) => saveSettings(project.id, patch)}
+        />
+      )}
+      {memberToRemove && (
+        <ConfirmRemoveMemberModal
+          email={memberToRemove.email}
+          onClose={() => setMemberToRemove(null)}
+          onConfirm={async () => {
+            await removeMember(project.id, memberToRemove.id);
+            setLiveMembers((prev) =>
+              prev.filter((m) => m.id !== memberToRemove.id),
+            );
+          }}
         />
       )}
     </div>
