@@ -6,6 +6,7 @@ implementation. Swapping to S3 later means adding an ``S3StorageBackend`` and
 changing the binding in ``get_storage`` — nothing else in the app changes.
 """
 
+import asyncio
 import uuid
 from pathlib import Path
 from typing import AsyncIterator, Protocol, runtime_checkable
@@ -93,26 +94,35 @@ class S3StorageBackend:
         ext = Path(file.filename or "").suffix
         key = f"{uuid.uuid4().hex}{ext}"
         body = await file.read()
-        self._s3.put_object(Bucket=self.bucket, Key=key, Body=body)
+        await asyncio.to_thread(
+            self._s3.put_object, Bucket=self.bucket, Key=key, Body=body
+        )
         return key
 
     async def get(self, path: str) -> AsyncIterator[bytes]:
         try:
-            obj = self._s3.get_object(Bucket=self.bucket, Key=path)
+            obj = await asyncio.to_thread(
+                self._s3.get_object, Bucket=self.bucket, Key=path
+            )
         except ClientError as e:
             if e.response["Error"]["Code"] == "NoSuchKey":
                 raise FileNotFoundError(path)
             raise
         stream = obj["Body"]
-        while chunk := stream.read(_CHUNK_SIZE):
-            yield chunk
+        try:
+            while chunk := await asyncio.to_thread(stream.read, _CHUNK_SIZE):
+                yield chunk
+        finally:
+            stream.close()
 
     def exists(self, path: str) -> bool:
         try:
             self._s3.head_object(Bucket=self.bucket, Key=path)
             return True
-        except ClientError:
-            return False
+        except ClientError as e:
+            if e.response["Error"]["Code"] in ("404", "NoSuchKey"):
+                return False
+            raise
 
     def delete(self, path: str) -> None:
         self._s3.delete_object(Bucket=self.bucket, Key=path)
