@@ -8,11 +8,9 @@ from sqlalchemy import (
     Integer,
     BigInteger,
     Boolean,
-    ForeignKey,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 from src.core.base import Base
-from src.modules.auth.models import User
 
 
 class Project(Base):
