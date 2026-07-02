@@ -76,7 +76,7 @@ jobs:
 
       - name: Build backend Docker image
         run: |
-          docker build -t backend:ci ./backend
+          docker build -t backend:ci .
 
   frontend:
     runs-on: ubuntu-latest
@@ -91,4 +91,4 @@ jobs:
 
       - name: Build frontend Docker image
         run: |
-          docker build -t frontend:ci ./frontend
+          docker build -t frontend:ci .
