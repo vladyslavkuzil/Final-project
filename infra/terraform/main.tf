@@ -151,6 +151,8 @@ module "ecs" {
 
   backend_target_group_arn  = module.alb.backend_target_group_arn
   frontend_target_group_arn = module.alb.frontend_target_group_arn
+
+  s3_bucket_name = aws_s3_bucket.documents.bucket
 }
 
 # ─── S3: DOCUMENT STORAGE ───────────────────────────────────────────────────
