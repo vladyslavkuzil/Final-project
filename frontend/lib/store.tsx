@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { api, ApiError, getMyEmail, getToken } from "./api";
 
 export type Role = "Admin" | "Member";
@@ -44,8 +45,7 @@ type ApiProject = {
   total_size_bytes: number;
   created_at: string;
   is_finished: boolean;
-  admin: ApiUser;
-  users: ApiUser[];
+  user_role?: string | null;
 };
 
 type ApiDocument = {
@@ -97,7 +97,10 @@ function formatDate(iso: string): string {
 }
 
 function mapProject(p: ApiProject, me: string): Project {
-  const adminEmail = p.admin?.email ?? "";
+  let myRole: Role;
+  if (p.user_role === "owner") myRole = "Admin";
+  else if (p.user_role === "participant") myRole = "Member";
+  else myRole = "Member";
   return {
     id: p.id,
     name: p.name,
@@ -106,12 +109,8 @@ function mapProject(p: ApiProject, me: string): Project {
     filesCount: p.documents_count,
     created: formatMonthYear(p.created_at),
     finished: p.is_finished,
-    myRole: adminEmail === me ? "Admin" : "Member",
-    members: (p.users ?? []).map((u) => ({
-      email: u.email,
-      role: u.email === adminEmail ? "Admin" : "Member",
-      active: u.is_active,
-    })),
+    myRole,
+    members: [],
     files: [],
   };
 }
@@ -126,16 +125,28 @@ type Store = {
   createProject: (name: string, desc: string) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   leaveProject: (id: string) => Promise<void>;
+  loadProjectById: (id: string) => Promise<void>;
   loadProjectDocuments: (projectId: string) => Promise<void>;
   deleteFile: (projectId: string, docId: string) => Promise<void>;
-  renameFile: (projectId: string, docId: string, title: string) => Promise<void>;
+  renameFile: (
+    projectId: string,
+    docId: string,
+    title: string,
+  ) => Promise<void>;
   uploadFile: (projectId: string, file: File, title: string) => Promise<void>;
-  downloadFile: (projectId: string, docId: string, name: string) => Promise<void>;
+  downloadFile: (
+    projectId: string,
+    docId: string,
+    name: string,
+  ) => Promise<void>;
   saveSettings: (
     projectId: string,
-    patch: { name: string; desc: string; finished: boolean }
+    patch: { name: string; desc: string; finished: boolean },
   ) => Promise<void>;
   inviteByEmail: (projectId: string, email: string) => Promise<void>;
+  generateJoinCode: (projectId: string) => Promise<string>;
+  joinProject: (code: string) => Promise<string>;
+  removeMember: (projectId: string, userId: string) => Promise<void>;
 };
 
 const StoreContext = createContext<Store | null>(null);
@@ -153,12 +164,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (!getToken()) return;
     try {
       const data = await api.get<ApiProject[]>("/projects");
-      const emails: Record<string, string> = {};
-      for (const p of data) {
-        for (const u of p.users ?? []) emails[u.id] = u.email;
-        if (p.admin) emails[p.admin.id] = p.admin.email;
-      }
-      setUserEmails(emails);
       setProjects(data.map((p) => mapProject(p, current)));
     } finally {
       setLoaded(true);
@@ -174,20 +179,33 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const createProject = async (name: string, desc: string) => {
     await api.post("/projects", { name, description: desc });
     await refresh();
+    toast.success("Project created");
   };
 
   const deleteProject = async (id: string) => {
     await api.del(`/project/${id}`);
     await refresh();
+    toast.success("Project deleted");
   };
 
   const leaveProject = async (id: string) => {
     await api.post(`/project/${id}/leave`);
     await refresh();
+    toast.success("Left project");
+  };
+
+  const loadProjectById = async (id: string) => {
+    const current = getMyEmail();
+    const data = await api.get<ApiProject>(`/project/by-id/${id}/info`);
+    setProjects((ps) =>
+      ps.map((p) => (p.id === id ? mapProject(data, current) : p)),
+    );
   };
 
   const loadProjectDocuments = async (projectId: string) => {
-    const docs = await api.get<ApiDocument[]>(`/project/${projectId}/documents`);
+    const docs = await api.get<ApiDocument[]>(
+      `/project/${projectId}/documents`,
+    );
     const files: FileItem[] = docs.map((d) => {
       const { ext, color } = fileMeta(d.file_path || d.title);
       return {
@@ -202,8 +220,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     });
     setProjects((ps) =>
       ps.map((p) =>
-        p.id === projectId ? { ...p, files, filesCount: files.length } : p
-      )
+        p.id === projectId ? { ...p, files, filesCount: files.length } : p,
+      ),
     );
   };
 
@@ -212,7 +230,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     await loadProjectDocuments(projectId);
   };
 
-  const renameFile = async (projectId: string, docId: string, title: string) => {
+  const renameFile = async (
+    projectId: string,
+    docId: string,
+    title: string,
+  ) => {
     await api.put(`/project/${projectId}/documents/${docId}`, { title });
     await loadProjectDocuments(projectId);
   };
@@ -225,7 +247,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     await loadProjectDocuments(projectId);
   };
 
-  const downloadFile = async (projectId: string, docId: string, name: string) => {
+  const downloadFile = async (
+    projectId: string,
+    docId: string,
+    name: string,
+  ) => {
     const blob = await api.blob(`/project/${projectId}/documents/${docId}`);
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -239,7 +265,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const saveSettings = async (
     projectId: string,
-    patch: { name: string; desc: string; finished: boolean }
+    patch: { name: string; desc: string; finished: boolean },
   ) => {
     await api.put(`/project/${projectId}/info`, {
       name: patch.name.trim() || undefined,
@@ -247,23 +273,31 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       is_finished: patch.finished,
     });
     await refresh();
+    toast.success("Settings saved");
+  };
+
+  const generateJoinCode = async (projectId: string): Promise<string> => {
+    const data = await api.post<{ code: string }>(`/project/${projectId}/join-code`, {});
+    return data.code;
+  };
+
+  const joinProject = async (code: string): Promise<string> => {
+    const data = await api.post<{ project_id: string }>(`/join/${encodeURIComponent(code)}`);
+    await refresh();
+    toast.success("Joined project");
+    return data.project_id;
+  };
+
+  const removeMember = async (projectId: string, userId: string) => {
+    await api.del(`/project/${projectId}/members/${userId}`);
+    await refresh();
+    toast.success("Member removed");
   };
 
   const inviteByEmail = async (projectId: string, email: string) => {
-    // Look up the user by email first, then invite them by id. A 404 means no
-    // account with that email exists yet.
-    let user: ApiUser;
-    try {
-      user = await api.get<ApiUser>(`/users?email=${encodeURIComponent(email)}`);
-    } catch (e) {
-      if (e instanceof ApiError) {
-        if (e.status === 404) throw new Error("No user found with that email.");
-        if (e.status === 422) throw new Error("Enter a valid email address.");
-      }
-      throw e;
-    }
-    await api.post(`/project/${projectId}/invite/${user.id}`);
+    await api.post(`/project/${projectId}/invite`, { email });
     await refresh();
+    toast.success("Invite sent");
   };
 
   return (
@@ -276,6 +310,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         createProject,
         deleteProject,
         leaveProject,
+        loadProjectById,
         loadProjectDocuments,
         deleteFile,
         renameFile,
@@ -283,6 +318,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         downloadFile,
         saveSettings,
         inviteByEmail,
+        generateJoinCode,
+        joinProject,
+        removeMember,
       }}
     >
       {children}

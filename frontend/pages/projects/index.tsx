@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { Hov, Logo } from "../../components/infoboard/ui";
-import { NewProjectModal } from "../../components/infoboard/modals";
+import { JoinProjectModal, NewProjectModal } from "../../components/infoboard/modals";
 import { useStore } from "../../lib/store";
 import { clearAuth, getToken } from "../../lib/api";
 
 export default function ProjectsHome() {
   const router = useRouter();
-  const { me, projects, createProject, refresh } = useStore();
+  const { me, projects, createProject, refresh, joinProject } = useStore();
   const [showNew, setShowNew] = useState(false);
+  const [showJoin, setShowJoin] = useState(false);
 
   useEffect(() => {
     if (!getToken()) {
@@ -63,7 +64,9 @@ export default function ProjectsHome() {
         </div>
       </header>
 
-      <main style={{ maxWidth: 1080, margin: "0 auto", padding: "36px 24px 80px" }}>
+      <main
+        style={{ maxWidth: 1080, margin: "0 auto", padding: "36px 24px 80px" }}
+      >
         <div
           style={{
             display: "flex",
@@ -74,26 +77,34 @@ export default function ProjectsHome() {
             flexWrap: "wrap",
           }}
         >
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600, letterSpacing: "-.5px" }}>My Projects</h1>
+          <h1
+            style={{
+              margin: 0,
+              fontSize: 24,
+              fontWeight: 600,
+              letterSpacing: "-.5px",
+            }}
+          >
+            My Projects
+          </h1>
           <div style={{ display: "flex", gap: 10 }}>
-            <div title="Coming soon" style={{ opacity: 0.5, cursor: "not-allowed", filter: "grayscale(1)" }}>
-              <button
-                disabled
-                style={{
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: "#5c5b57",
-                  background: "#fff",
-                  border: "1px solid #e3e3df",
-                  borderRadius: 8,
-                  padding: "8px 14px",
-                  cursor: "not-allowed",
-                  pointerEvents: "none",
-                }}
-              >
-                Join Project
-              </button>
-            </div>
+            <Hov
+              as="button"
+              onClick={() => setShowJoin(true)}
+              style={{
+                fontSize: 13,
+                fontWeight: 500,
+                color: "#5c5b57",
+                background: "#fff",
+                border: "1px solid #e3e3df",
+                borderRadius: 8,
+                padding: "8px 14px",
+                cursor: "pointer",
+              }}
+              hoverStyle={{ background: "#f4f4f2" }}
+            >
+              Join Project
+            </Hov>
             <Hov
               as="button"
               onClick={() => setShowNew(true)}
@@ -112,13 +123,22 @@ export default function ProjectsHome() {
               }}
               hoverStyle={{ background: "#2560d8" }}
             >
-              <span style={{ fontSize: 15, lineHeight: 1, marginTop: -1 }}>+</span>New Project
+              <span style={{ fontSize: 15, lineHeight: 1, marginTop: -1 }}>
+                +
+              </span>
+              New Project
             </Hov>
           </div>
         </div>
 
         {projects.length > 0 ? (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 16 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))",
+              gap: 16,
+            }}
+          >
             {projects.map((p) => (
               <Hov
                 key={p.id}
@@ -148,7 +168,15 @@ export default function ProjectsHome() {
                     marginBottom: 9,
                   }}
                 >
-                  <h3 style={{ margin: 0, fontSize: 15.5, fontWeight: 600, letterSpacing: "-.2px", lineHeight: 1.3 }}>
+                  <h3
+                    style={{
+                      margin: 0,
+                      fontSize: 15.5,
+                      fontWeight: 600,
+                      letterSpacing: "-.2px",
+                      lineHeight: 1.3,
+                    }}
+                  >
                     {p.name}
                   </h3>
                   <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
@@ -251,7 +279,9 @@ export default function ProjectsHome() {
             >
               empty
             </div>
-            <p style={{ margin: 0, fontSize: 14.5, color: "#8b8a83" }}>No projects yet. Create one to get started.</p>
+            <p style={{ margin: 0, fontSize: 14.5, color: "#8b8a83" }}>
+              No projects yet. Create one to get started.
+            </p>
           </div>
         )}
       </main>
@@ -260,6 +290,15 @@ export default function ProjectsHome() {
         <NewProjectModal
           onClose={() => setShowNew(false)}
           onCreate={(name, desc) => createProject(name, desc)}
+        />
+      )}
+      {showJoin && (
+        <JoinProjectModal
+          onClose={() => setShowJoin(false)}
+          onJoin={async (code) => {
+            const projectId = await joinProject(code);
+            router.push(`/projects/${projectId}`);
+          }}
         />
       )}
     </div>
