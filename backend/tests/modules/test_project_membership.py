@@ -428,7 +428,8 @@ class TestRemoveUser(unittest.TestCase):
         user = make_user()
         membership = make_membership()
         db = sequential_db([user, membership])
-        result = services.remove_user(db, "proj-1", "user-1", caller_id="owner-1")
+        with patch("src.modules.project_membership.services.redis_client"):
+            result = services.remove_user(db, "proj-1", "user-1", caller_id="owner-1")
         db.delete.assert_called_once_with(membership)
         db.commit.assert_called_once()
         self.assertEqual(result, {"message": "User removed from project"})

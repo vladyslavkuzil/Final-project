@@ -40,7 +40,6 @@ class SimpleProject:
         self.description = description
         self.admin_id = admin_id
         self.is_finished = False
-        self.users = []
         self.user_role: MembershipRole | None = None
 
         # New required fields
@@ -98,7 +97,23 @@ class ProjectServiceUnitTests(unittest.TestCase):
     @patch("src.modules.projects.services.TypeAdapter")
     def test_get_all_projects_returns_project_list(self, mock_type_adapter):
         projects = [SimpleProject("proj-1"), SimpleProject("proj-2")]
-        self.db.query.return_value = make_query(projects)
+        memberships = [
+            Mock(project_id="proj-1", role=MembershipRole.OWNER),
+            Mock(project_id="proj-2", role=MembershipRole.PARTICIPANT),
+        ]
+
+        # Pierwsze query: Project -> join -> filter -> distinct -> all
+        projects_query = Mock()
+        projects_query.join.return_value = projects_query
+        projects_query.filter.return_value = projects_query
+        projects_query.distinct.return_value = projects_query
+        projects_query.all.return_value = projects
+
+        # Drugie query: ProjectMembership -> filter (iterowane bez .all())
+        memberships_query = Mock()
+        memberships_query.filter.return_value = memberships
+
+        self.db.query.side_effect = [projects_query, memberships_query]
 
         expected_serialized = [{"id": "proj-1"}, {"id": "proj-2"}]
         mock_adapter = Mock()
@@ -131,11 +146,12 @@ class ProjectServiceUnitTests(unittest.TestCase):
             with self.assertRaises(ProjectAlreadyExistsError):
                 services.create_project(self.db, "project-1", "admin-id")
 
-    def test_create_project_raises_when_user_not_found(self):
-        self.db.query.return_value = make_query(None)
+    def test_create_project_does_not_require_user_lookup(self):
         with patch.object(services, "get_project_by_name", return_value=None):
-            with self.assertRaises(UserNotFoundError):
-                services.create_project(self.db, "project-1", "missing-admin")
+            project = services.create_project(self.db, "project-1", "admin-id")
+
+        self.assertEqual(project.name, "project-1")
+        self.assertEqual(project.user_role, MembershipRole.OWNER)
 
     def test_create_project_commits_and_returns_project(self):
         user = make_user()
@@ -154,37 +170,31 @@ class ProjectServiceUnitTests(unittest.TestCase):
         self.assertEqual(project.user_role, MembershipRole.OWNER)
         self.db.commit.assert_called_once()
         self.db.refresh.assert_called_once_with(project)
-        self.assertIn(user, project.users)
 
     def test_update_project_raises_when_not_found(self):
-        with patch.object(services, "get_project_by_id_admin", return_value=None):
+        with patch.object(services, "get_project_by_id", return_value=None):
             with self.assertRaises(ProjectNotFoundError):
-                services.update_project(self.db, "missing-id", "admin-id", name="x")
+                services.update_project(self.db, "missing-id", name="x")
 
     def test_update_project_raises_when_duplicate_name(self):
         project = SimpleProject()
         other_project = SimpleProject(project_id="proj-2", name="existing-name")
         with (
-            patch.object(services, "get_project_by_id_admin", return_value=project),
-            patch.object(
-                services, "get_project_by_name_admin", return_value=other_project
-            ),
+            patch.object(services, "get_project_by_id", return_value=project),
+            patch.object(services, "get_project_by_name", return_value=other_project),
         ):
             with self.assertRaises(ProjectAlreadyExistsError):
-                services.update_project(
-                    self.db, project.id, "admin-id", name="existing-name"
-                )
+                services.update_project(self.db, project.id, name="existing-name")
 
     def test_update_project_changes_fields(self):
         project = SimpleProject()
         with (
-            patch.object(services, "get_project_by_id_admin", return_value=project),
-            patch.object(services, "get_project_by_name_admin", return_value=None),
+            patch.object(services, "get_project_by_id", return_value=project),
+            patch.object(services, "get_project_by_name", return_value=None),
         ):
             updated = services.update_project(
                 self.db,
                 project.id,
-                "admin-id",
                 name="project-2",
                 description="updated",
                 is_finished=True,
@@ -196,46 +206,40 @@ class ProjectServiceUnitTests(unittest.TestCase):
         self.db.commit.assert_called_once()
 
     def test_delete_project_raises_when_not_found(self):
-        with patch.object(services, "get_project_by_id_admin", return_value=None):
+        with patch.object(services, "get_project_by_id", return_value=None):
             with self.assertRaises(ProjectNotFoundError):
-                services.delete_project(self.db, "missing-id", "admin-id")
+                services.delete_project(self.db, "missing-id")
 
     def test_delete_project_commits_and_returns_message(self):
         project = SimpleProject()
-        with patch.object(services, "get_project_by_id_admin", return_value=project):
-            result = services.delete_project(self.db, project.id, "admin-id")
+        with patch.object(services, "get_project_by_id", return_value=project):
+            result = services.delete_project(self.db, project.id)
 
         self.db.delete.assert_called_once_with(project)
         self.db.commit.assert_called_once()
         self.assertEqual(result, {"message": "Project deleted successfully"})
 
     def test_add_user_to_project_raises_when_project_missing(self):
-        with patch.object(services, "get_project_by_id_admin", return_value=None):
+        with patch.object(services, "get_project_by_id", return_value=None):
             with self.assertRaises(ProjectNotFoundError):
-                services.add_user_to_project(
-                    self.db, "user-2", "missing-id", "admin-id"
-                )
+                services.add_user_to_project(self.db, "user-2", "missing-id")
 
     def test_add_user_to_project_raises_when_user_missing(self):
         project = SimpleProject()
         self.db.query.return_value = make_query(None)
-        with patch.object(services, "get_project_by_id_admin", return_value=project):
+        with patch.object(services, "get_project_by_id", return_value=project):
             with self.assertRaises(UserNotFoundError):
-                services.add_user_to_project(
-                    self.db, "missing-user", project.id, "admin-id"
-                )
+                services.add_user_to_project(self.db, "missing-user", project.id)
 
     def test_add_user_to_project_appends_user(self):
         project = SimpleProject()
         user = make_user(user_id="user-2")
         self.db.query.return_value = make_query(user)
-        with patch.object(services, "get_project_by_id_admin", return_value=project):
-            updated = services.add_user_to_project(
-                self.db, "user-2", project.id, "admin-id"
-            )
+        with patch.object(services, "get_project_by_id", return_value=project):
+            updated = services.add_user_to_project(self.db, "user-2", project.id)
 
         self.db.commit.assert_called_once()
-        self.assertIn(user, updated.users)
+        self.assertEqual(updated.id, project.id)
 
     def test_leave_project_raises_when_project_missing(self):
         # Arrange — the project lookup finds nothing
@@ -255,38 +259,32 @@ class ProjectServiceUnitTests(unittest.TestCase):
             services.leave_project(self.db, project.id, "owner-id")
 
     def test_leave_project_removes_membership_and_user(self):
-        # Arrange — a participant who belongs to someone else's project alongside
-        # the owner. leave_project makes three lookups: project, membership, user.
+        # Arrange — project lookup, membership lookup, then all-memberships lookup
         project = SimpleProject(admin_id="owner-id")
-        membership = Mock()
-        owner = make_user(user_id="owner-id")
-        user = make_user(user_id="user-2")
-        project.users = [owner, user]
+        membership = Mock(user_id="user-2")
+        all_memberships = [Mock(user_id="owner-id"), Mock(user_id="user-2")]
         self.db.query.side_effect = [
             make_query(project),
             make_query(membership),
-            make_query(user),
+            make_query(all_memberships),
         ]
 
         # Act
         services.leave_project(self.db, project.id, "user-2")
 
-        # Assert — the user is removed from the project and the membership deleted
-        self.assertNotIn(user, project.users)
+        # Assert — the membership row is deleted
         self.db.delete.assert_called_once_with(membership)
         self.db.commit.assert_called_once()
 
     def test_leave_project_invalidates_every_member_cache(self):
         # Arrange — a project with the owner and the leaving participant.
         project = SimpleProject(admin_id="owner-id")
-        membership = Mock()
-        owner = make_user(user_id="owner-id")
-        user = make_user(user_id="user-2")
-        project.users = [owner, user]
+        membership = Mock(user_id="user-2")
+        all_memberships = [Mock(user_id="owner-id"), Mock(user_id="user-2")]
         self.db.query.side_effect = [
             make_query(project),
             make_query(membership),
-            make_query(user),
+            make_query(all_memberships),
         ]
 
         # Act
@@ -329,7 +327,6 @@ class TestLeaveProjectEndpoint:
         db.add_all([owner, participant])
         db.flush()
         project = Project(name="leave-endpoint-project", admin_id=owner.id)
-        project.users.extend([owner, participant])
         db.add(project)
         db.flush()
         db.add_all(
