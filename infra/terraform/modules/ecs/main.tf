@@ -51,6 +51,25 @@ resource "aws_iam_role" "ecs_task" {
   assume_role_policy = data.aws_iam_policy_document.ecs_task_assume_role.json
 }
 
+resource "aws_iam_role_policy" "task_s3" {
+  name = "${var.project_name}-task-s3"
+  role = aws_iam_role.ecs_task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:DeleteObject",
+        "s3:HeadObject",
+      ]
+      Resource = "arn:aws:s3:::${var.s3_bucket_name}/*"
+    }]
+  })
+}
+
 resource "aws_ecs_task_definition" "backend" {
   family                   = "${var.project_name}-backend"
   requires_compatibilities = ["FARGATE"]
@@ -77,7 +96,8 @@ resource "aws_ecs_task_definition" "backend" {
       environment = [
         { name = "DATABASE_URL", value = var.database_url },
         { name = "SECRET_KEY", value = var.secret_key },
-        { name = "ALGORITHM", value = var.algorithm }
+        { name = "ALGORITHM", value = var.algorithm },
+        { name = "S3_BUCKET_NAME", value = var.s3_bucket_name }
       ]
 
       logConfiguration = {
