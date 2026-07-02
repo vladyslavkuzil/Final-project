@@ -1,0 +1,60 @@
+name: CD
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        run: |
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
+          | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+
+      - name: Get version
+        run: echo "VERSION=${GITHUB_REF_NAME}" >> $GITHUB_ENV
+
+      - name: Build backend image
+        run: |
+          docker build -t ${{ secrets.BACKEND_REPO }}:$VERSION ./backend
+
+      - name: Tag backend image
+        run: |
+          docker tag ${{ secrets.BACKEND_REPO }}:$VERSION ${{ secrets.ECR_REGISTRY }}/${{ secrets.BACKEND_REPO }}:$VERSION
+          docker tag ${{ secrets.BACKEND_REPO }}:$VERSION ${{ secrets.ECR_REGISTRY }}/${{ secrets.BACKEND_REPO }}:latest
+
+      - name: Push backend image
+        run: |
+          docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.BACKEND_REPO }}:$VERSION
+          docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.BACKEND_REPO }}:latest
+
+      - name: Build frontend image
+        run: |
+          docker build -t ${{ secrets.FRONTEND_REPO }}:$VERSION ./frontend
+
+      - name: Tag frontend image
+        run: |
+          docker tag ${{ secrets.FRONTEND_REPO }}:$VERSION ${{ secrets.ECR_REGISTRY }}/${{ secrets.FRONTEND_REPO }}:$VERSION
+          docker tag ${{ secrets.FRONTEND_REPO }}:$VERSION ${{ secrets.ECR_REGISTRY }}/${{ secrets.FRONTEND_REPO }}:latest
+
+      - name: Push frontend image
+        run: |
+          docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.FRONTEND_REPO }}:$VERSION
+          docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.FRONTEND_REPO }}:latest
