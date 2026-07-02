@@ -1,29 +1,234 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { ProjectChatPanel } from "../../components/chat/project-chat";
-import { Hov } from "../../components/infoboard/ui";
+import { Hov, notion } from "../../components/infoboard/ui";
 import { InviteModal, SettingsModal } from "../../components/infoboard/modals";
 import { useStore, type FileItem } from "../../lib/store";
 import { getToken } from "../../lib/api";
 
-const initialOf = (email: string) => (email || "?").charAt(0).toUpperCase();
+// ── keyframe injection ────────────────────────────────────────────────────────
+if (typeof document !== "undefined") {
+  const id = "__notion_dashboard_styles";
+  if (!document.getElementById(id)) {
+    const s = document.createElement("style");
+    s.id = id;
+    s.textContent = `
+      @keyframes fadeSlideIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+      }
+      @keyframes shimmer {
+        0%   { background-position: -400px 0; }
+        100% { background-position:  400px 0; }
+      }
 
-function navStyle(active: boolean): React.CSSProperties {
-  return {
-    display: "flex",
-    alignItems: "center",
-    gap: 9,
-    padding: "7px 8px",
-    borderRadius: 7,
-    fontSize: 13.5,
-    cursor: "pointer",
-    textDecoration: "none",
-    background: active ? "#efefec" : undefined,
-    color: active ? "#37352f" : "#5c5b57",
-    fontWeight: active ? 600 : 450,
-  };
+      .skeleton {
+        background: linear-gradient(
+          90deg,
+          ${notion.bgSubtle} 25%,
+          #ececea 50%,
+          ${notion.bgSubtle} 75%
+        );
+        background-size: 400px 100%;
+        animation: shimmer 1.4s ease infinite;
+        border-radius: 4px;
+      }
+
+      /* Sidebar nav item */
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 6px 8px;
+        border-radius: 4px;
+        font-size: 13.5px;
+        cursor: pointer;
+        text-decoration: none;
+        color: ${notion.textMuted};
+        font-weight: 450;
+        transition: background 120ms ease, color 120ms ease;
+        user-select: none;
+      }
+      .nav-item:hover  { background: ${notion.hoverWash}; color: ${notion.text}; }
+      .nav-item.active { background: ${notion.hoverWash}; color: ${notion.text}; font-weight: 600; }
+
+      /* File row */
+      .file-row { transition: background 100ms ease; }
+      .file-row:hover { background: ${notion.hoverWash} !important; }
+
+      /* Member row */
+      .member-row { transition: background 100ms ease; }
+      .member-row:hover { background: ${notion.hoverWash} !important; }
+
+      /* Icon button */
+      .icon-btn {
+        width: 26px; height: 26px;
+        display: flex; align-items: center; justify-content: center;
+        background: transparent;
+        border: 1px solid transparent;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 13px;
+        color: ${notion.textMuted};
+        transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+      }
+      .icon-btn:hover { background: ${notion.bgSubtle}; border-color: ${notion.border}; color: ${notion.text}; }
+      .icon-btn.danger:hover { background: #fdf2f1; border-color: #e8b9b3; color: #c0392b; }
+
+      /* Primary button */
+      .primary-btn {
+        font-size: 13px; font-weight: 500;
+        color: #fff; background: #191919;
+        border: none; border-radius: 4px;
+        padding: 6px 13px; cursor: pointer;
+        display: flex; align-items: center; gap: 6px;
+        transition: background 150ms ease, transform 100ms ease, box-shadow 100ms ease;
+      }
+      .primary-btn:hover {
+        background: #000;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+      }
+
+      /* Danger button */
+      .danger-btn {
+        width: 100%; font-size: 13px; font-weight: 500;
+        color: ${notion.danger}; background: transparent;
+        border: 1px solid ${notion.border}; border-radius: 4px;
+        padding: 7px; cursor: pointer;
+        display: flex; align-items: center; justify-content: center; gap: 6px;
+        transition: background 150ms ease, border-color 150ms ease;
+        font-family: inherit;
+      }
+      .danger-btn:hover { background: #fdf2f1; border-color: #e8b9b3; }
+
+      /* Tab content fade */
+      .tab-content {
+        opacity: 0;
+        animation: fadeSlideIn 0.3s ease forwards;
+      }
+
+      /* Sidebar slide in */
+      .sidebar-in {
+        opacity: 0;
+        animation: fadeIn 0.35s ease 0.05s forwards;
+      }
+    `;
+    document.head.appendChild(s);
+  }
 }
 
+// ── helpers ───────────────────────────────────────────────────────────────────
+const initialOf = (email: string) => (email || "?").charAt(0).toUpperCase();
+
+// Deterministic avatar color — same palette as ProjectChatPanel
+const AVATAR_COLORS = ["#e2a03f","#9065b0","#4f8a5b","#d15c5c","#3980c1","#c17ec9"];
+function avatarColor(seed: string): string {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+// ── small shared components ───────────────────────────────────────────────────
+function Badge({
+  label,
+  color,
+  bg,
+}: {
+  label: string;
+  color: string;
+  bg: string;
+}) {
+  return (
+    <span
+      style={{
+        fontSize: 11,
+        fontWeight: 600,
+        color,
+        background: bg,
+        padding: "2px 7px",
+        borderRadius: 3,
+        letterSpacing: ".1px",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function SectionHeader({
+  title,
+  action,
+}: {
+  title: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginBottom: 22,
+      }}
+    >
+      <h1
+        style={{
+          margin: 0,
+          fontSize: 20,
+          fontWeight: 700,
+          letterSpacing: "-.2px",
+          color: notion.text,
+        }}
+      >
+        {title}
+      </h1>
+      {action}
+    </div>
+  );
+}
+
+// ── skeleton rows for files loading state ─────────────────────────────────────
+function FileSkeleton() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div
+          key={i}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 90px 180px 110px 96px",
+            gap: 12,
+            padding: "12px 18px",
+            borderBottom: `1px solid ${notion.border}`,
+            alignItems: "center",
+            opacity: 0,
+            animation: `fadeSlideIn 0.3s ease ${i * 0.06}s forwards`,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="skeleton" style={{ width: 34, height: 26, borderRadius: 4 }} />
+            <div className="skeleton" style={{ width: "60%", height: 13 }} />
+          </div>
+          <div className="skeleton" style={{ width: 50, height: 13 }} />
+          <div className="skeleton" style={{ width: "70%", height: 13 }} />
+          <div className="skeleton" style={{ width: 70, height: 13 }} />
+          <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
+            <div className="skeleton" style={{ width: 26, height: 26, borderRadius: 4 }} />
+            <div className="skeleton" style={{ width: 26, height: 26, borderRadius: 4 }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── page ──────────────────────────────────────────────────────────────────────
 export default function ProjectDashboard() {
   const router = useRouter();
   const {
@@ -45,6 +250,7 @@ export default function ProjectDashboard() {
 
   const [tab, setTab] = useState<"files" | "members" | "chat">("files");
   const [modal, setModal] = useState<"invite" | "settings" | null>(null);
+  const [filesLoading, setFilesLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -55,9 +261,13 @@ export default function ProjectDashboard() {
     if (router.isReady && loaded && id && !project) router.replace("/projects");
   }, [router, router.isReady, loaded, id, project]);
 
-  // Documents aren't part of the projects list payload — fetch them on view.
   useEffect(() => {
-    if (id && project) loadProjectDocuments(id).catch(() => {});
+    if (id && project) {
+      setFilesLoading(true);
+      loadProjectDocuments(id)
+        .catch(() => {})
+        .finally(() => setFilesLoading(false));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, !!project]);
 
@@ -66,9 +276,10 @@ export default function ProjectDashboard() {
   const isAdmin = project.myRole === "Admin";
   const projInitial = initialOf(project.name.replace(/^Project\s+/i, ""));
 
-  // Run an async action, surfacing any failure as an alert. Returns whether it
-  // succeeded so callers can navigate only on success.
-  const runOrAlert = async (fn: () => Promise<void>, fallback: string): Promise<boolean> => {
+  const runOrAlert = async (
+    fn: () => Promise<void>,
+    fallback: string
+  ): Promise<boolean> => {
     try {
       await fn();
       return true;
@@ -79,286 +290,291 @@ export default function ProjectDashboard() {
   };
 
   const onDeleteProject = async () => {
-    if (!window.confirm('Delete "' + project.name + '"? This cannot be undone.')) return;
-    if (await runOrAlert(() => deleteProject(project.id), "Failed to delete project")) {
+    if (!window.confirm(`Delete "${project.name}"? This cannot be undone.`)) return;
+    if (await runOrAlert(() => deleteProject(project.id), "Failed to delete project"))
       router.push("/projects");
-    }
   };
 
   const onLeaveProject = async () => {
-    if (!window.confirm('Leave "' + project.name + '"? You will lose access to its files.')) return;
-    if (await runOrAlert(() => leaveProject(project.id), "Failed to leave project")) {
+    if (!window.confirm(`Leave "${project.name}"? You will lose access to its files.`)) return;
+    if (await runOrAlert(() => leaveProject(project.id), "Failed to leave project"))
       router.push("/projects");
-    }
   };
 
   const onRename = async (f: FileItem) => {
     const next = window.prompt("Rename document", f.name);
     if (!next || next === f.name) return;
-    await runOrAlert(() => renameFile(project.id, f.id, next), "Failed to rename document");
+    await runOrAlert(() => renameFile(project.id, f.id, next), "Failed to rename");
   };
 
   const onDelete = (f: FileItem) =>
-    runOrAlert(() => deleteFile(project.id, f.id), "Failed to delete document");
+    runOrAlert(() => deleteFile(project.id, f.id), "Failed to delete");
 
   const onDownload = (f: FileItem) =>
-    runOrAlert(() => downloadFile(project.id, f.id, f.name), "Failed to download document");
+    runOrAlert(() => downloadFile(project.id, f.id, f.name), "Failed to download");
 
   const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    e.target.value = ""; // allow re-selecting the same file later
+    e.target.value = "";
     if (!file) return;
     const title = window.prompt("Document title", file.name);
     if (title === null) return;
     await runOrAlert(
       () => uploadFile(project.id, file, title.trim() || file.name),
-      "Failed to upload document"
+      "Failed to upload"
     );
   };
 
-  const iconBtn: React.CSSProperties = {
-    width: 28,
-    height: 28,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#fff",
-    border: "1px solid #e8e8e4",
-    borderRadius: 6,
-    cursor: "pointer",
-  };
-
   return (
-    <div style={{ minHeight: "100vh", background: "#f7f7f5" }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: notion.bgSubtle,
+        fontFamily: notion.font,
+      }}
+    >
       <div style={{ display: "flex", minHeight: "100vh" }}>
-        {/* Sidebar */}
+
+        {/* ── Sidebar ── */}
         <aside
+          className="sidebar-in"
           style={{
-            width: 248,
+            width: 232,
             flexShrink: 0,
-            background: "#fbfbfa",
-            borderRight: "1px solid #ebebe8",
+            background: notion.bgSidebar,
+            borderRight: `1px solid ${notion.border}`,
             display: "flex",
             flexDirection: "column",
-            padding: "18px 14px",
+            padding: "14px 10px 16px",
             position: "sticky",
             top: 0,
             height: "100vh",
+            overflowY: "auto",
           }}
         >
-          <Hov
-            as="a"
+          {/* Back link */}
+          <a
+            className="nav-item"
             onClick={() => router.push("/projects")}
-            style={{
-              fontSize: 12.5,
-              color: "#9b9a93",
-              cursor: "pointer",
-              textDecoration: "none",
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-              marginBottom: 16,
-              padding: "0 6px",
-            }}
-            hoverStyle={{ color: "#5c5b57" }}
+            style={{ marginBottom: 10, fontSize: 12.5, color: notion.textFaint }}
           >
-            ← All Projects
-          </Hov>
+            <span style={{ fontSize: 11 }}>←</span>
+            All projects
+          </a>
+
+          {/* Project identity block */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 8,
-              padding: "0 6px 16px",
-              borderBottom: "1px solid #ededea",
-              marginBottom: 12,
+              gap: 9,
+              padding: "8px 8px 12px",
+              borderBottom: `1px solid ${notion.border}`,
+              marginBottom: 8,
             }}
           >
             <div
               style={{
-                width: 24,
-                height: 24,
+                width: 28,
+                height: 28,
                 borderRadius: 6,
-                background: "#2f6fed",
+                background: avatarColor(project.name),
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 color: "#fff",
                 fontWeight: 700,
-                fontSize: 11,
+                fontSize: 12,
                 flexShrink: 0,
+                boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
               }}
             >
               {projInitial}
             </div>
-            <span style={{ fontSize: 14.5, fontWeight: 600, letterSpacing: "-.2px", lineHeight: 1.2 }}>
-              {project.name}
-            </span>
+            <div style={{ minWidth: 0 }}>
+              <div
+                style={{
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  letterSpacing: "-.1px",
+                  color: notion.text,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {project.name}
+              </div>
+              <div style={{ fontSize: 11.5, color: notion.textFaint, marginTop: 1 }}>
+                {project.members?.length ?? 0} member{(project.members?.length ?? 0) !== 1 ? "s" : ""}
+              </div>
+            </div>
           </div>
 
-          <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <Hov as="a" onClick={() => setTab("files")} style={navStyle(tab === "files")} hoverStyle={{ background: "#efefec" }}>
-              <span style={{ display: "flex", width: 16, justifyContent: "center" }}>▤</span>Files
-            </Hov>
-            <Hov as="a" onClick={() => setTab("chat")} style={navStyle(tab === "chat")} hoverStyle={{ background: "#efefec" }}>
-              <span style={{ display: "flex", width: 16, justifyContent: "center" }}>💬</span>Chat
-            </Hov>
-            <Hov
-              as="a"
-              onClick={() => setTab("members")}
-              style={navStyle(tab === "members")}
-              hoverStyle={{ background: "#efefec" }}
-            >
-              <span style={{ display: "flex", width: 16, justifyContent: "center" }}>◍</span>Members
-            </Hov>
-            {isAdmin && (
-              <Hov
-                as="a"
-                onClick={() => setModal("settings")}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 9,
-                  padding: "7px 8px",
-                  borderRadius: 7,
-                  fontSize: 13.5,
-                  color: "#5c5b57",
-                  cursor: "pointer",
-                  textDecoration: "none",
-                  fontWeight: 450,
-                }}
-                hoverStyle={{ background: "#efefec" }}
+          {/* Nav */}
+          <nav style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            {(
+              [
+                { key: "files",   icon: "▤", label: "Files"   },
+                { key: "chat",    icon: "💬", label: "Chat"    },
+                { key: "members", icon: "◍", label: "Members" },
+              ] as const
+            ).map(({ key, icon, label }) => (
+              <a
+                key={key}
+                className={`nav-item${tab === key ? " active" : ""}`}
+                onClick={() => setTab(key)}
               >
-                <span style={{ display: "flex", width: 16, justifyContent: "center" }}>⚙</span>Project Settings
-              </Hov>
+                <span style={{ width: 16, display: "flex", justifyContent: "center", flexShrink: 0 }}>
+                  {icon}
+                </span>
+                {label}
+                {/* Unread dot placeholder for chat */}
+                {key === "chat" && tab !== "chat" && (
+                  <span
+                    style={{
+                      marginLeft: "auto",
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      background: notion.accentBlue,
+                      flexShrink: 0,
+                      opacity: 0,
+                      // Reveal this when you have unread message count logic
+                    }}
+                  />
+                )}
+              </a>
+            ))}
+
+            {isAdmin && (
+              <a
+                className="nav-item"
+                onClick={() => setModal("settings")}
+                style={{ marginTop: 4 }}
+              >
+                <span style={{ width: 16, display: "flex", justifyContent: "center", flexShrink: 0 }}>
+                  ⚙
+                </span>
+                Settings
+              </a>
             )}
           </nav>
 
-          {isAdmin && (
-            <div style={{ marginTop: "auto", paddingTop: 14 }}>
-              <Hov
-                as="button"
-                onClick={onDeleteProject}
-                style={{
-                  width: "100%",
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: "#c0392b",
-                  background: "#fff",
-                  border: "1px solid #f0d4d0",
-                  borderRadius: 8,
-                  padding: 8,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 6,
-                }}
-                hoverStyle={{ background: "#fdf2f1", borderColor: "#e8b9b3" }}
-              >
-                <span style={{ fontSize: 13 }}>🗑</span>Delete Project
-              </Hov>
+          {/* Bottom danger action */}
+          <div style={{ marginTop: "auto", paddingTop: 14 }}>
+            {/* Subtle project meta */}
+            <div
+              style={{
+                fontSize: 11.5,
+                color: notion.textFaint,
+                padding: "0 8px 12px",
+                lineHeight: 1.6,
+              }}
+            >
+              <div>Created {project.created}</div>
+              <div>{project.size} used</div>
             </div>
-          )}
-          {!isAdmin && (
-            <div style={{ marginTop: "auto", paddingTop: 14 }}>
-              <Hov
-                as="button"
-                onClick={onLeaveProject}
-                style={{
-                  width: "100%",
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: "#c0392b",
-                  background: "#fff",
-                  border: "1px solid #f0d4d0",
-                  borderRadius: 8,
-                  padding: 8,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 6,
-                }}
-                hoverStyle={{ background: "#fdf2f1", borderColor: "#e8b9b3" }}
-              >
-                <span style={{ fontSize: 14, lineHeight: 1 }}>⏻</span>Leave Project
-              </Hov>
-            </div>
-          )}
+
+            <button
+              className="danger-btn"
+              onClick={isAdmin ? onDeleteProject : onLeaveProject}
+            >
+              <span style={{ fontSize: 13 }}>{isAdmin ? "🗑" : "⏻"}</span>
+              {isAdmin ? "Delete project" : "Leave project"}
+            </button>
+          </div>
         </aside>
 
-        {/* Main */}
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-          {tab === "files" && (
-            <main style={{ padding: "30px 36px 90px", maxWidth: 980, width: "100%" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22 }}>
-                <h1 style={{ margin: 0, fontSize: 21, fontWeight: 600, letterSpacing: "-.4px" }}>Files</h1>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.docx,.xlsx,.txt"
-                  onChange={onPickFile}
-                  style={{ display: "none" }}
-                />
-                <Hov
-                  as="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 500,
-                    color: "#fff",
-                    background: "#2f6fed",
-                    border: "none",
-                    borderRadius: 8,
-                    padding: "8px 14px",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                  hoverStyle={{ background: "#2560d8" }}
-                >
-                  <span style={{ fontSize: 14, marginTop: -1 }}>↑</span>Upload Document
-                </Hov>
-              </div>
+        {/* ── Main content ── */}
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
 
-              {project.files.length > 0 ? (
-                <div style={{ background: "#fff", border: "1px solid #ebebe8", borderRadius: 12, overflow: "hidden" }}>
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 90px 180px 110px 96px",
-                      gap: 12,
-                      padding: "11px 18px",
-                      borderBottom: "1px solid #ededea",
-                      fontSize: 11.5,
-                      fontWeight: 600,
-                      color: "#9b9a93",
-                      textTransform: "uppercase",
-                      letterSpacing: ".4px",
-                    }}
-                  >
-                    <span>Name</span>
-                    <span>Size</span>
-                    <span>Uploaded By</span>
-                    <span>Date</span>
-                    <span style={{ textAlign: "right" }}>Actions</span>
-                  </div>
-                  {project.files.map((f, i) => (
-                    <Hov
+          {/* ── Files tab ── */}
+          {tab === "files" && (
+            <main
+              className="tab-content"
+              style={{ padding: "32px 40px 90px", maxWidth: 980, width: "100%" }}
+            >
+              <SectionHeader
+                title="Files"
+                action={
+                  <>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".pdf,.docx,.xlsx,.txt"
+                      onChange={onPickFile}
+                      style={{ display: "none" }}
+                    />
+                    <button
+                      className="primary-btn"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <span style={{ fontSize: 15, marginTop: -1 }}>↑</span>
+                      Upload
+                    </button>
+                  </>
+                }
+              />
+
+              <div
+                style={{
+                  background: notion.bgPage,
+                  border: `1px solid ${notion.border}`,
+                  borderRadius: 6,
+                  overflow: "hidden",
+                }}
+              >
+                {/* Table header */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 90px 180px 110px 96px",
+                    gap: 12,
+                    padding: "9px 18px",
+                    borderBottom: `1px solid ${notion.border}`,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: notion.textFaint,
+                    textTransform: "uppercase",
+                    letterSpacing: ".5px",
+                    background: notion.bgSubtle,
+                  }}
+                >
+                  <span>Name</span>
+                  <span>Size</span>
+                  <span>Uploaded by</span>
+                  <span>Date</span>
+                  <span style={{ textAlign: "right" }}>Actions</span>
+                </div>
+
+                {filesLoading ? (
+                  <FileSkeleton />
+                ) : project.files.length > 0 ? (
+                  project.files.map((f, i) => (
+                    <div
                       key={f.name + i}
+                      className="file-row"
                       style={{
                         display: "grid",
                         gridTemplateColumns: "1fr 90px 180px 110px 96px",
                         gap: 12,
-                        padding: "12px 18px",
-                        borderBottom: "1px solid #f3f3f1",
+                        padding: "10px 18px",
+                        borderBottom: `1px solid ${notion.border}`,
                         alignItems: "center",
                         fontSize: 13,
+                        opacity: 0,
+                        animation: `fadeSlideIn 0.3s ease ${i * 0.04}s forwards`,
                       }}
-                      hoverStyle={{ background: "#fafaf9" }}
                     >
+                      {/* Name + ext badge */}
                       <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                         <span
                           style={{
@@ -369,7 +585,7 @@ export default function ProjectDashboard() {
                             color: "#fff",
                             background: f.color,
                             padding: "4px 0",
-                            borderRadius: 5,
+                            borderRadius: 4,
                             letterSpacing: ".3px",
                           }}
                         >
@@ -378,7 +594,7 @@ export default function ProjectDashboard() {
                         <span
                           style={{
                             fontWeight: 500,
-                            color: "#37352f",
+                            color: notion.text,
                             whiteSpace: "nowrap",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
@@ -387,171 +603,211 @@ export default function ProjectDashboard() {
                           {f.name}
                         </span>
                       </div>
-                      <span style={{ color: "#8b8a83" }}>{f.size}</span>
+
+                      <span style={{ color: notion.textMuted }}>{f.size}</span>
                       <span
-                        style={{ color: "#8b8a83", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                        style={{
+                          color: notion.textMuted,
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
                       >
                         {f.by}
                       </span>
-                      <span style={{ color: "#8b8a83" }}>{f.date}</span>
+                      <span style={{ color: notion.textMuted }}>{f.date}</span>
+
+                      {/* Actions */}
                       <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
-                        <Hov
-                          as="button"
+                        <button
+                          className="icon-btn"
                           title="Download"
                           onClick={() => onDownload(f)}
-                          style={{ ...iconBtn, color: "#6b6b67", fontSize: 13 }}
-                          hoverStyle={{ background: "#f4f4f2", color: "#37352f" }}
                         >
                           ↓
-                        </Hov>
-                        <Hov
-                          as="button"
+                        </button>
+                        <button
+                          className="icon-btn"
                           title="Rename"
                           onClick={() => onRename(f)}
-                          style={{ ...iconBtn, color: "#6b6b67", fontSize: 12 }}
-                          hoverStyle={{ background: "#f4f4f2", color: "#37352f" }}
                         >
                           ✎
-                        </Hov>
+                        </button>
                         {isAdmin && (
-                          <Hov
-                            as="button"
+                          <button
+                            className="icon-btn danger"
                             title="Delete"
                             onClick={() => onDelete(f)}
-                            style={{ ...iconBtn, color: "#c0392b", fontSize: 12 }}
-                            hoverStyle={{ background: "#fdf2f1", borderColor: "#e8b9b3" }}
                           >
                             🗑
-                          </Hov>
+                          </button>
                         )}
                       </div>
-                    </Hov>
-                  ))}
-                </div>
-              ) : (
-                <div
-                  style={{
-                    textAlign: "center",
-                    padding: "64px 20px",
-                    background: "#fff",
-                    border: "1px solid #ebebe8",
-                    borderRadius: 12,
-                  }}
-                >
+                    </div>
+                  ))
+                ) : (
+                  // Empty state
                   <div
                     style={{
-                      width: 96,
-                      height: 70,
-                      margin: "0 auto 18px",
-                      borderRadius: 10,
-                      border: "1px dashed #d6d5ce",
-                      background:
-                        "repeating-linear-gradient(45deg,#f4f4f2,#f4f4f2 8px,#efefec 8px,#efefec 16px)",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      padding: "64px 20px",
+                      gap: 14,
+                      opacity: 0,
+                      animation: "fadeSlideIn 0.4s ease 0.1s forwards",
                     }}
-                  />
-                  <p style={{ margin: 0, fontSize: 14, color: "#8b8a83" }}>No files yet. Upload the first one.</p>
-                </div>
-              )}
+                  >
+                    <div
+                      style={{
+                        width: 56,
+                        height: 56,
+                        borderRadius: 10,
+                        background: notion.bgSubtle,
+                        border: `1.5px dashed ${notion.borderStrong}`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 22,
+                      }}
+                    >
+                      📄
+                    </div>
+                    <div style={{ textAlign: "center" }}>
+                      <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 600, color: notion.text }}>
+                        No files yet
+                      </p>
+                      <p style={{ margin: 0, fontSize: 13, color: notion.textMuted }}>
+                        Upload the first document to get started.
+                      </p>
+                    </div>
+                    <button
+                      className="primary-btn"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <span style={{ fontSize: 15 }}>↑</span>
+                      Upload a file
+                    </button>
+                  </div>
+                )}
+              </div>
             </main>
           )}
 
+          {/* ── Members tab ── */}
           {tab === "members" && (
-            <main style={{ padding: "30px 36px 90px", maxWidth: 760, width: "100%" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22 }}>
-                <h1 style={{ margin: 0, fontSize: 21, fontWeight: 600, letterSpacing: "-.4px" }}>Members</h1>
-                {isAdmin && (
-                  <Hov
-                    as="button"
-                    onClick={() => setModal("invite")}
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 500,
-                      color: "#fff",
-                      background: "#2f6fed",
-                      border: "none",
-                      borderRadius: 8,
-                      padding: "8px 14px",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                    }}
-                    hoverStyle={{ background: "#2560d8" }}
-                  >
-                    <span style={{ fontSize: 15, marginTop: -1 }}>+</span>Invite User
-                  </Hov>
-                )}
-              </div>
-              <div style={{ background: "#fff", border: "1px solid #ebebe8", borderRadius: 12, overflow: "hidden" }}>
+            <main
+              className="tab-content"
+              style={{ padding: "32px 40px 90px", maxWidth: 760, width: "100%" }}
+            >
+              <SectionHeader
+                title="Members"
+                action={
+                  isAdmin ? (
+                    <button
+                      className="primary-btn"
+                      onClick={() => setModal("invite")}
+                    >
+                      <span style={{ fontSize: 15, marginTop: -1 }}>+</span>
+                      Invite
+                    </button>
+                  ) : undefined
+                }
+              />
+
+              <div
+                style={{
+                  background: notion.bgPage,
+                  border: `1px solid ${notion.border}`,
+                  borderRadius: 6,
+                  overflow: "hidden",
+                }}
+              >
                 {project.members.map((m, i) => (
                   <div
                     key={m.email + i}
+                    className="member-row"
                     style={{
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
-                      padding: "14px 18px",
-                      borderBottom: "1px solid #f3f3f1",
+                      padding: "11px 18px",
+                      borderBottom: `1px solid ${notion.border}`,
+                      opacity: 0,
+                      animation: `fadeSlideIn 0.3s ease ${i * 0.05}s forwards`,
                     }}
                   >
+                    {/* Avatar + email */}
                     <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
                       <div
                         style={{
-                          width: 32,
-                          height: 32,
+                          width: 30,
+                          height: 30,
                           borderRadius: "50%",
-                          background: "#eef0f4",
+                          background: avatarColor(m.email),
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: "#5c5b57",
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: "#fff",
+                          flexShrink: 0,
                         }}
                       >
                         {initialOf(m.email)}
                       </div>
-                      <span style={{ fontSize: 13.5, fontWeight: 500 }}>{m.email}</span>
+                      <div>
+                        <div
+                          style={{
+                            fontSize: 13.5,
+                            fontWeight: 500,
+                            color: notion.text,
+                          }}
+                        >
+                          {m.email.split("@")[0]}
+                        </div>
+                        <div style={{ fontSize: 12, color: notion.textFaint }}>
+                          {m.email}
+                        </div>
+                      </div>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+
+                    {/* Status + role */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 5,
+                          fontSize: 12,
+                          color: notion.textFaint,
+                        }}
+                      >
                         <span
                           style={{
-                            width: 7,
-                            height: 7,
+                            width: 6,
+                            height: 6,
                             borderRadius: "50%",
-                            background: m.active ? "#22a559" : "#d0a02b",
+                            background: m.active ? "#4f8a5b" : "#d0a02b",
                             display: "inline-block",
+                            flexShrink: 0,
                           }}
                         />
-                        <span style={{ fontSize: 12, color: "#9b9a93" }}>{m.active ? "Active" : "Pending"}</span>
+                        {m.active ? "Active" : "Pending"}
                       </div>
+
                       {m.role === "Admin" ? (
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: "#1a56db",
-                            background: "#e8f0fe",
-                            padding: "3px 9px",
-                            borderRadius: 20,
-                          }}
-                        >
-                          Admin
-                        </span>
+                        <Badge
+                          label="Admin"
+                          color={notion.accentBlue}
+                          bg="rgba(35,131,226,0.1)"
+                        />
                       ) : (
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: "#6b6b67",
-                            background: "#f0f0ee",
-                            padding: "3px 9px",
-                            borderRadius: 20,
-                          }}
-                        >
-                          Member
-                        </span>
+                        <Badge
+                          label="Member"
+                          color={notion.textMuted}
+                          bg={notion.bgSubtle}
+                        />
                       )}
                     </div>
                   </div>
@@ -560,10 +816,19 @@ export default function ProjectDashboard() {
             </main>
           )}
 
-          {tab === "chat" && <ProjectChatPanel projectId={project.id} projectName={project.name} />}
+          {/* ── Chat tab ── */}
+          {tab === "chat" && (
+            <div className="tab-content" style={{ flex: 1, minHeight: 0 }}>
+              <ProjectChatPanel
+                projectId={project.id}
+                projectName={project.name}
+              />
+            </div>
+          )}
         </div>
       </div>
 
+      {/* ── Modals ── */}
       {modal === "invite" && (
         <InviteModal
           onClose={() => setModal(null)}
