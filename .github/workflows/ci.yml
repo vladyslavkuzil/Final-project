@@ -73,3 +73,22 @@ jobs:
 
       - name: Run tests
         run: uv run python -m pytest
+
+      - name: Build backend Docker image
+        run: |
+          docker build -t backend:ci ./backend
+
+  frontend:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build frontend Docker image
+        run: |
+          docker build -t frontend:ci ./frontend
