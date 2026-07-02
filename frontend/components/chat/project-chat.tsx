@@ -7,6 +7,7 @@ type ChatMessage = {
   id: string;
   project_id: string;
   sender_id: string;
+  sender_email: string;
   content: string;
   created_at: string;
 };
@@ -190,7 +191,7 @@ export function ProjectChatPanel({
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "#5c5b57" }}>{message.sender_id}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "#5c5b57" }}>{message.sender_email.split("@")[0]}</span>
                   <span style={{ fontSize: 11.5, color: "#9b9a93" }}>{formatTime(message.created_at)}</span>
                 </div>
                 <p style={{ margin: "8px 0 0", fontSize: 14, lineHeight: 1.5, color: "#37352f", whiteSpace: "pre-wrap" }}>

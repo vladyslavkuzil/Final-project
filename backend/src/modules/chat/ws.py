@@ -4,6 +4,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
+from src.modules.auth.models import User
 from src.modules.chat.manager import ConnectionManager
 from src.modules.chat.schemas import WSMessageIn, WSMessageOut
 from src.modules.chat import services as service
@@ -29,6 +30,8 @@ async def project_chat_ws(websocket: WebSocket, project_id: str, token: str):
 
         # 3. CONNECT
         await manager.connect(project_id, websocket)
+
+        sender_email = db.query(User.email).filter(User.id == user_id).scalar()
 
         # 4. MESSAGE LOOP
         while True:
@@ -62,6 +65,7 @@ async def project_chat_ws(websocket: WebSocket, project_id: str, token: str):
                 id=message.id,
                 project_id=project_id,
                 sender_id=user_id,
+                sender_email=sender_email,
                 content=message.content,
                 created_at=str(message.created_at),
             )
