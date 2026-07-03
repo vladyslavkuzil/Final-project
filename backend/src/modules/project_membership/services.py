@@ -38,6 +38,7 @@ def _delete_existing_code(db: Session, project_id: str):
     )
     if existing_code is not None:
         db.delete(existing_code)
+        db.flush()
 
 
 def _add_user(db: Session, project_id: str, user_id: str):

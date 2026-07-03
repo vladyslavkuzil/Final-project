@@ -228,11 +228,7 @@ function ModalFooter({
       <button className="modal-btn-cancel" onClick={onClose}>
         Cancel
       </button>
-      <button
-        className="modal-btn-confirm"
-        onClick={onConfirm}
-        disabled={busy}
-      >
+      <button className="modal-btn-confirm" onClick={onConfirm} disabled={busy}>
         {busy && <Spinner />}
         {busy ? busyLabel : confirmLabel}
       </button>
@@ -405,6 +401,10 @@ export function InviteModal({
   onGenerateCode?: () => Promise<string>;
 }) {
   const [email, setEmail] = useState("");
+  const [generatedCode, setGeneratedCode] = useState<string | null>(null);
+  const [codeGenerating, setCodeGenerating] = useState(false);
+  const [codeError, setCodeError] = useState("");
+  const [copied, setCopied] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { error, busy, submit } = useModalSubmit(
@@ -478,7 +478,7 @@ export function InviteModal({
           Invite a member
         </h2>
         <p style={{ margin: 0, fontSize: 13, color: notion.textMuted }}>
-          They'll receive an email with a link to join this project.
+          They will be added to the project directly.
         </p>
       </div>
 
@@ -511,22 +511,114 @@ export function InviteModal({
           }}
         >
           <span style={{ fontSize: 13 }}>ℹ️</span>
-          <span style={{ fontSize: 12.5, color: notion.textMuted, lineHeight: 1.5 }}>
-            New members join as <strong style={{ color: notion.text }}>Member</strong>.
-            Admins can change roles after they accept.
+          <span
+            style={{ fontSize: 12.5, color: notion.textMuted, lineHeight: 1.5 }}
+          >
+            New members join as{" "}
+            <strong style={{ color: notion.text }}>Member</strong>.
           </span>
         </div>
       </div>
 
       {error && <ErrorBanner message={error} />}
 
-      <ModalFooter
-        onClose={onClose}
-        busy={busy}
-        confirmLabel="Send invite"
-        busyLabel="Sending…"
-        onConfirm={send}
-      />
+      {/* Email actions */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: 8,
+          paddingTop: 6,
+          marginBottom: 20,
+        }}
+      >
+        <button className="modal-btn-cancel" onClick={onClose}>
+          Cancel
+        </button>
+        <button
+          className="modal-btn-confirm"
+          onClick={send}
+          disabled={busy || !email.trim()}
+        >
+          {busy && <Spinner />}
+          {busy ? "Sending…" : "Send invite"}
+        </button>
+      </div>
+
+      {/* ── Invite via code ── */}
+      {onGenerateCode && (
+        <>
+          <ModalDivider />
+          <div style={{ marginBottom: 20 }}>
+            <FieldLabel>Or invite via join code</FieldLabel>
+            {!generatedCode ? (
+              <>
+                <button
+                  className="modal-btn-cancel"
+                  onClick={handleGenerateCode}
+                  disabled={codeGenerating}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 7,
+                    width: "100%",
+                    justifyContent: "center",
+                    padding: "8px 14px",
+                  }}
+                >
+                  {codeGenerating ? (
+                    <>
+                      <span
+                        style={{
+                          display: "inline-block",
+                          width: 12,
+                          height: 12,
+                          border: "2px solid rgba(55,53,47,0.2)",
+                          borderTopColor: notion.text,
+                          borderRadius: "50%",
+                          animation: "spin 0.65s linear infinite",
+                          flexShrink: 0,
+                        }}
+                      />
+                      Generating…
+                    </>
+                  ) : (
+                    <>🔗 Generate invite code</>
+                  )}
+                </button>
+                {codeError && <ErrorBanner message={codeError} />}
+              </>
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  animation: "fadeSlideIn 0.2s ease",
+                }}
+              >
+                <input
+                  className="modal-input"
+                  readOnly
+                  value={generatedCode}
+                  style={{ flex: 1, fontFamily: "monospace", fontSize: 13 }}
+                  onFocus={(e) => e.target.select()}
+                />
+                <button
+                  className="modal-btn-confirm"
+                  onClick={handleCopy}
+                  style={{
+                    flexShrink: 0,
+                    minWidth: 72,
+                    justifyContent: "center",
+                  }}
+                >
+                  {copied ? "✓ Copied" : "Copy"}
+                </button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </Modal>
   );
 }
@@ -541,7 +633,11 @@ export function ConfirmRemoveMemberModal({
   onClose: () => void;
   onConfirm: () => Promise<void>;
 }) {
-  const { error, busy, submit } = useModalSubmit(onConfirm, onClose, "Failed to remove member");
+  const { error, busy, submit } = useModalSubmit(
+    onConfirm,
+    onClose,
+    "Failed to remove member",
+  );
 
   return (
     <Modal maxWidth={400} onClose={onClose}>
@@ -574,7 +670,9 @@ export function ConfirmRemoveMemberModal({
           Remove member
         </h2>
         <p style={{ margin: 0, fontSize: 13, color: notion.textMuted }}>
-          <strong style={{ color: notion.text }}>{email}</strong> will lose access to this project.
+          Do you really want to remove{" "}
+          <strong style={{ color: notion.text }}>{email}</strong> from the
+          project?
         </p>
       </div>
 
@@ -695,8 +793,8 @@ export function SettingsModal({
     finished: boolean;
   }) => void | Promise<void>;
 }) {
-  const [name, setName]         = useState(project.name);
-  const [desc, setDesc]         = useState(project.desc);
+  const [name, setName] = useState(project.name);
+  const [desc, setDesc] = useState(project.desc);
   const [finished, setFinished] = useState(project.finished);
   const nameRef = useRef<HTMLInputElement>(null);
 
@@ -749,7 +847,14 @@ export function SettingsModal({
       <ModalDivider />
 
       {/* Fields */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 18 }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 14,
+          marginBottom: 18,
+        }}
+      >
         <div>
           <FieldLabel>Project name</FieldLabel>
           <input
@@ -798,7 +903,9 @@ export function SettingsModal({
           >
             Mark as finished
           </div>
-          <div style={{ fontSize: 12, color: notion.textFaint, lineHeight: 1.5 }}>
+          <div
+            style={{ fontSize: 12, color: notion.textFaint, lineHeight: 1.5 }}
+          >
             Archive this project once all work is complete.
           </div>
         </div>
@@ -818,9 +925,7 @@ export function SettingsModal({
             flexShrink: 0,
             background: finished ? notion.toggleOn : notion.toggleOff,
             transition: "background 200ms ease",
-            boxShadow: finished
-              ? "0 0 0 3px rgba(34,165,89,0.15)"
-              : "none",
+            boxShadow: finished ? "0 0 0 3px rgba(34,165,89,0.15)" : "none",
           }}
         >
           <span

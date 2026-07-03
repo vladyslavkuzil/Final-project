@@ -750,7 +750,7 @@ export default function ProjectDashboard() {
           {tab === "members" && (
             <main
               className="tab-content"
-              style={{ padding: "32px 40px 90px", maxWidth: 760, width: "100%" }}
+              style={{ padding: "32px 40px 90px", maxWidth: 980, width: "100%" }}
             >
               <SectionHeader
                 title="Members"
@@ -861,6 +861,16 @@ export default function ProjectDashboard() {
                           color={notion.textMuted}
                           bg={notion.bgSubtle}
                         />
+                      )}
+
+                      {isAdmin && m.role !== "owner" && m.email !== me && (
+                        <button
+                          className="icon-btn danger"
+                          title="Remove member"
+                          onClick={() => setMemberToRemove({ id: m.id, email: m.email })}
+                        >
+                          🗑
+                        </button>
                       )}
                     </div>
                   </div>
