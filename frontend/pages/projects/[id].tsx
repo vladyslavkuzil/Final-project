@@ -2,7 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { ProjectChatPanel } from "../../components/chat/project-chat";
 import { Hov, notion } from "../../components/infoboard/ui";
-import { ConfirmDeleteProjectModal, ConfirmLeaveProjectModal, ConfirmRemoveMemberModal, InviteModal, SettingsModal } from "../../components/infoboard/modals";
+import {
+  ConfirmDeleteProjectModal,
+  ConfirmLeaveProjectModal,
+  ConfirmRemoveMemberModal,
+  InviteModal,
+  SettingsModal,
+} from "../../components/infoboard/modals";
 import { useStore, type FileItem } from "../../lib/store";
 import { api, getToken } from "../../lib/api";
 
@@ -126,10 +132,18 @@ if (typeof document !== "undefined") {
 const initialOf = (email: string) => (email || "?").charAt(0).toUpperCase();
 
 // Deterministic avatar color — same palette as ProjectChatPanel
-const AVATAR_COLORS = ["#e2a03f","#9065b0","#4f8a5b","#d15c5c","#3980c1","#c17ec9"];
+const AVATAR_COLORS = [
+  "#e2a03f",
+  "#9065b0",
+  "#4f8a5b",
+  "#d15c5c",
+  "#3980c1",
+  "#c17ec9",
+];
 function avatarColor(seed: string): string {
   let hash = 0;
-  for (let i = 0; i < seed.length; i++) hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < seed.length; i++)
+    hash = seed.charCodeAt(i) + ((hash << 5) - hash);
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
@@ -212,15 +226,24 @@ function FileSkeleton() {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div className="skeleton" style={{ width: 34, height: 26, borderRadius: 4 }} />
+            <div
+              className="skeleton"
+              style={{ width: 34, height: 26, borderRadius: 4 }}
+            />
             <div className="skeleton" style={{ width: "60%", height: 13 }} />
           </div>
           <div className="skeleton" style={{ width: 50, height: 13 }} />
           <div className="skeleton" style={{ width: "70%", height: 13 }} />
           <div className="skeleton" style={{ width: 70, height: 13 }} />
           <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
-            <div className="skeleton" style={{ width: 26, height: 26, borderRadius: 4 }} />
-            <div className="skeleton" style={{ width: 26, height: 26, borderRadius: 4 }} />
+            <div
+              className="skeleton"
+              style={{ width: 26, height: 26, borderRadius: 4 }}
+            />
+            <div
+              className="skeleton"
+              style={{ width: 26, height: 26, borderRadius: 4 }}
+            />
           </div>
         </div>
       ))}
@@ -268,8 +291,13 @@ export default function ProjectDashboard() {
   const project = projects.find((p) => p.id === id);
   const [modal, setModal] = useState<"invite" | "settings" | null>(null);
   const [filesLoading, setFilesLoading] = useState(true);
-  const [liveMembers, setLiveMembers] = useState<{ id: string; email: string; is_active: boolean; role: string }[]>([]);
-  const [memberToRemove, setMemberToRemove] = useState<{ id: string; email: string } | null>(null);
+  const [liveMembers, setLiveMembers] = useState<
+    { id: string; email: string; is_active: boolean; role: string }[]
+  >([]);
+  const [memberToRemove, setMemberToRemove] = useState<{
+    id: string;
+    email: string;
+  } | null>(null);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -327,7 +355,7 @@ export default function ProjectDashboard() {
 
   const runOrAlert = async (
     fn: () => Promise<void>,
-    fallback: string
+    fallback: string,
   ): Promise<boolean> => {
     try {
       await fn();
@@ -345,14 +373,20 @@ export default function ProjectDashboard() {
   const onRename = async (f: FileItem) => {
     const next = window.prompt("Rename document", f.name);
     if (!next || next === f.name) return;
-    await runOrAlert(() => renameFile(project.id, f.id, next), "Failed to rename");
+    await runOrAlert(
+      () => renameFile(project.id, f.id, next),
+      "Failed to rename",
+    );
   };
 
   const onDelete = (f: FileItem) =>
     runOrAlert(() => deleteFile(project.id, f.id), "Failed to delete");
 
   const onDownload = (f: FileItem) =>
-    runOrAlert(() => downloadFile(project.id, f.id, f.name), "Failed to download");
+    runOrAlert(
+      () => downloadFile(project.id, f.id, f.name),
+      "Failed to download",
+    );
 
   const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -362,7 +396,7 @@ export default function ProjectDashboard() {
     if (title === null) return;
     await runOrAlert(
       () => uploadFile(project.id, file, title.trim() || file.name),
-      "Failed to upload"
+      "Failed to upload",
     );
   };
 
@@ -375,7 +409,6 @@ export default function ProjectDashboard() {
       }}
     >
       <div style={{ display: "flex", minHeight: "100vh" }}>
-
         {/* ── Sidebar ── */}
         <aside
           className="sidebar-in"
@@ -397,7 +430,11 @@ export default function ProjectDashboard() {
           <a
             className="nav-item"
             onClick={() => router.push("/projects")}
-            style={{ marginBottom: 10, fontSize: 12.5, color: notion.textFaint }}
+            style={{
+              marginBottom: 10,
+              fontSize: 12.5,
+              color: notion.textFaint,
+            }}
           >
             <span style={{ fontSize: 11 }}>←</span>
             All projects
@@ -446,7 +483,13 @@ export default function ProjectDashboard() {
               >
                 {project.name}
               </div>
-              <div style={{ fontSize: 11.5, color: notion.textFaint, marginTop: 1 }}>
+              <div
+                style={{
+                  fontSize: 11.5,
+                  color: notion.textFaint,
+                  marginTop: 1,
+                }}
+              >
                 {liveMembers.length} member{liveMembers.length !== 1 ? "s" : ""}
               </div>
             </div>
@@ -456,8 +499,8 @@ export default function ProjectDashboard() {
           <nav style={{ display: "flex", flexDirection: "column", gap: 1 }}>
             {(
               [
-                { key: "files",   icon: "▤", label: "Files"   },
-                { key: "chat",    icon: "💬", label: "Chat"    },
+                { key: "files", icon: "▤", label: "Files" },
+                { key: "chat", icon: "💬", label: "Chat" },
                 { key: "members", icon: "◍", label: "Members" },
               ] as const
             ).map(({ key, icon, label }) => (
@@ -466,7 +509,14 @@ export default function ProjectDashboard() {
                 className={`nav-item${tab === key ? " active" : ""}`}
                 onClick={() => setTab(key)}
               >
-                <span style={{ width: 16, display: "flex", justifyContent: "center", flexShrink: 0 }}>
+                <span
+                  style={{
+                    width: 16,
+                    display: "flex",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
                   {icon}
                 </span>
                 {label}
@@ -494,7 +544,14 @@ export default function ProjectDashboard() {
                 onClick={() => setModal("settings")}
                 style={{ marginTop: 4 }}
               >
-                <span style={{ width: 16, display: "flex", justifyContent: "center", flexShrink: 0 }}>
+                <span
+                  style={{
+                    width: 16,
+                    display: "flex",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
                   ⚙
                 </span>
                 Settings
@@ -540,12 +597,15 @@ export default function ProjectDashboard() {
             flexDirection: "column",
           }}
         >
-
           {/* ── Files tab ── */}
           {tab === "files" && (
             <main
               className="tab-content"
-              style={{ padding: "32px 40px 90px", maxWidth: 980, width: "100%" }}
+              style={{
+                padding: "32px 40px 90px",
+                maxWidth: 980,
+                width: "100%",
+              }}
             >
               <SectionHeader
                 title="Files"
@@ -620,7 +680,14 @@ export default function ProjectDashboard() {
                       }}
                     >
                       {/* Name + ext badge */}
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          minWidth: 0,
+                        }}
+                      >
                         <span
                           style={{
                             flexShrink: 0,
@@ -663,7 +730,13 @@ export default function ProjectDashboard() {
                       <span style={{ color: notion.textMuted }}>{f.date}</span>
 
                       {/* Actions */}
-                      <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 4,
+                          justifyContent: "flex-end",
+                        }}
+                      >
                         <button
                           className="icon-btn"
                           title="Download"
@@ -719,10 +792,23 @@ export default function ProjectDashboard() {
                       📄
                     </div>
                     <div style={{ textAlign: "center" }}>
-                      <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 600, color: notion.text }}>
+                      <p
+                        style={{
+                          margin: "0 0 4px",
+                          fontSize: 14,
+                          fontWeight: 600,
+                          color: notion.text,
+                        }}
+                      >
                         No files yet
                       </p>
-                      <p style={{ margin: 0, fontSize: 13, color: notion.textMuted }}>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 13,
+                          color: notion.textMuted,
+                        }}
+                      >
                         Upload the first document to get started.
                       </p>
                     </div>
@@ -743,7 +829,11 @@ export default function ProjectDashboard() {
           {tab === "members" && (
             <main
               className="tab-content"
-              style={{ padding: "32px 40px 90px", maxWidth: 980, width: "100%" }}
+              style={{
+                padding: "32px 40px 90px",
+                maxWidth: 980,
+                width: "100%",
+              }}
             >
               <SectionHeader
                 title="Members"
@@ -783,7 +873,9 @@ export default function ProjectDashboard() {
                     }}
                   >
                     {/* Avatar + email */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 11 }}
+                    >
                       <div
                         key={m.id}
                         style={{
@@ -819,7 +911,9 @@ export default function ProjectDashboard() {
                     </div>
 
                     {/* Status + role */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 12 }}
+                    >
                       <div
                         style={{
                           display: "flex",
@@ -860,7 +954,9 @@ export default function ProjectDashboard() {
                         <button
                           className="icon-btn danger"
                           title="Remove member"
-                          onClick={() => setMemberToRemove({ id: m.id, email: m.email })}
+                          onClick={() =>
+                            setMemberToRemove({ id: m.id, email: m.email })
+                          }
                         >
                           🗑
                         </button>
@@ -875,7 +971,11 @@ export default function ProjectDashboard() {
           {/* ── Chat tab ── always mounted to preserve WS connection and avoid re-fetching history */}
           <div
             className="tab-content"
-            style={{ flex: 1, minHeight: 0, display: tab === "chat" ? undefined : "none" }}
+            style={{
+              flex: 1,
+              minHeight: 0,
+              display: tab === "chat" ? undefined : "none",
+            }}
           >
             <ProjectChatPanel
               projectId={project.id}
