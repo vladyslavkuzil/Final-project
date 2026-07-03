@@ -30,7 +30,7 @@ class DocumentResponse(BaseModel):
     title: str
     file_path: str
     project_id: str
-    uploaded_by: str
+    uploaded_by: str | None
     created_at: datetime
     updated_at: datetime
 
