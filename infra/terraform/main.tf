@@ -152,6 +152,7 @@ module "ecs" {
   backend_target_group_arn  = module.alb.backend_target_group_arn
   frontend_target_group_arn = module.alb.frontend_target_group_arn
 
+  alb_dns_name   = module.alb.alb_dns_name
   s3_bucket_name = aws_s3_bucket.documents.bucket
 }
 

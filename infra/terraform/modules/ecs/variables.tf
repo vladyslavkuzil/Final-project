@@ -10,6 +10,11 @@ variable "ecs_security_group_id" {
   type = string
 }
 
+variable "alb_dns_name" {
+  type        = string
+  description = "DNS name of the Application Load Balancer"
+}
+
 variable "backend_image" {
   type = string
 }
