@@ -27,7 +27,7 @@ class Message(Base):
     )
 
     project_id: Mapped[str] = mapped_column(
-        ForeignKey("projects.id"),
+        ForeignKey("projects.id", ondelete="CASCADE"),
         index=True,
         nullable=False,
     )

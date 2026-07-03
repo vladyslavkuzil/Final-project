@@ -126,7 +126,11 @@ type Store = {
   deleteProject: (id: string) => Promise<void>;
   leaveProject: (id: string) => Promise<void>;
   loadProjectById: (id: string) => Promise<void>;
-  loadProjectDocuments: (projectId: string) => Promise<void>;
+  loadProjectDocuments: (
+    projectId: string,
+  ) => Promise<
+    { id: string; email: string; is_active: boolean; role: string }[]
+  >;
   deleteFile: (projectId: string, docId: string) => Promise<void>;
   renameFile: (
     projectId: string,
@@ -199,12 +203,21 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
-  const loadProjectDocuments = async (projectId: string) => {
+  const loadProjectDocuments = async (
+    projectId: string,
+  ): Promise<
+    { id: string; email: string; is_active: boolean; role: string }[]
+  > => {
     const [docs, membersData] = await Promise.all([
       api.get<ApiDocument[]>(`/project/${projectId}/documents`),
-      api.get<{ users: { id: string; email: string }[] }>(
-        `/project/${projectId}/members`,
-      ),
+      api.get<{
+        users: {
+          id: string;
+          email: string;
+          is_active: boolean;
+          role: string;
+        }[];
+      }>(`/project/${projectId}/members`),
     ]);
     const emailMap: Record<string, string> = {};
     for (const u of membersData.users) {
@@ -227,10 +240,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setProjects((ps) =>
       ps.map((p) =>
         p.id === projectId
-          ? { ...p, files, filesCount: files.length, size: formatBytes(totalBytes) }
+          ? {
+              ...p,
+              files,
+              filesCount: files.length,
+              size: formatBytes(totalBytes),
+            }
           : p,
       ),
     );
+    return membersData.users;
   };
 
   const deleteFile = async (projectId: string, docId: string) => {
