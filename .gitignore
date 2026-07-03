@@ -70,6 +70,7 @@ postgres_data/
 *.pid
 
 # Terraform / IaC
+infra/terraform/terraform.exe
 infra/**/.terraform/
 infra/**/.terraform.lock.hcl
 infra/**/*.tfstate

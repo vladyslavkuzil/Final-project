@@ -625,6 +625,38 @@ export function Modal({
           overflowY: "auto",
         }}
       >
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          style={{
+            position: "absolute",
+            top: 14,
+            right: 14,
+            width: 28,
+            height: 28,
+            borderRadius: 6,
+            border: "none",
+            background: "none",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 18,
+            color: "#9b9a93",
+            lineHeight: 1,
+            padding: 0,
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.background = "#f4f4f2";
+            (e.currentTarget as HTMLButtonElement).style.color = "#37352f";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.background = "none";
+            (e.currentTarget as HTMLButtonElement).style.color = "#9b9a93";
+          }}
+        >
+          ×
+        </button>
         {children}
       </div>
     </div>

@@ -244,7 +244,7 @@ function ModalFooter({
 function useModalSubmit(
   action: () => Promise<void> | void,
   onClose: () => void,
-  fallback: string
+  fallback: string,
 ) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -256,7 +256,8 @@ function useModalSubmit(
       await action();
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : fallback);
+      const msg = e instanceof Error ? e.message : fallback;
+      setError(msg);
     } finally {
       setBusy(false);
     }
@@ -293,7 +294,7 @@ export function NewProjectModal({
   const { error, busy, submit } = useModalSubmit(
     () => onCreate(name.trim(), desc.trim()),
     onClose,
-    "Failed to create project"
+    "Failed to create project",
   );
 
   // Auto-focus name field
@@ -397,9 +398,11 @@ export function NewProjectModal({
 export function InviteModal({
   onClose,
   onSend,
+  onGenerateCode,
 }: {
   onClose: () => void;
   onSend: (email: string) => void | Promise<void>;
+  onGenerateCode?: () => Promise<string>;
 }) {
   const [email, setEmail] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -407,7 +410,7 @@ export function InviteModal({
   const { error, busy, submit } = useModalSubmit(
     () => onSend(email.trim()),
     onClose,
-    "Failed to send invite"
+    "Failed to send invite",
   );
 
   useEffect(() => {
@@ -417,6 +420,30 @@ export function InviteModal({
   const send = () => {
     if (!email.trim()) return;
     submit();
+  };
+
+  const handleGenerateCode = async () => {
+    if (!onGenerateCode) return;
+    setCodeGenerating(true);
+    setCodeError("");
+    setGeneratedCode(null);
+    setCopied(false);
+    try {
+      const code = await onGenerateCode();
+      setGeneratedCode(code);
+    } catch (e) {
+      setCodeError(e instanceof Error ? e.message : "Failed to generate code");
+    } finally {
+      setCodeGenerating(false);
+    }
+  };
+
+  const handleCopy = () => {
+    if (!generatedCode) return;
+    navigator.clipboard.writeText(generatedCode).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
 
   return (
@@ -512,7 +539,11 @@ export function SettingsModal({
 }: {
   project: Project;
   onClose: () => void;
-  onSave: (patch: { name: string; desc: string; finished: boolean }) => void | Promise<void>;
+  onSave: (patch: {
+    name: string;
+    desc: string;
+    finished: boolean;
+  }) => void | Promise<void>;
 }) {
   const [name, setName]         = useState(project.name);
   const [desc, setDesc]         = useState(project.desc);
@@ -522,7 +553,7 @@ export function SettingsModal({
   const { error, busy, submit } = useModalSubmit(
     () => onSave({ name: name.trim(), desc: desc.trim(), finished }),
     onClose,
-    "Failed to save settings"
+    "Failed to save settings",
   );
 
   useEffect(() => {

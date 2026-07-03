@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { Hov, Logo } from "../../components/infoboard/ui";
-import { NewProjectModal } from "../../components/infoboard/modals";
+import { JoinProjectModal, NewProjectModal } from "../../components/infoboard/modals";
 import { useStore } from "../../lib/store";
 import { clearAuth, getToken } from "../../lib/api";
 
@@ -341,7 +341,7 @@ function EmptyState({ onNew }: { onNew: () => void }) {
 // ── page ──────────────────────────────────────────────────────────────────────
 export default function ProjectsHome() {
   const router = useRouter();
-  const { me, projects, createProject, refresh } = useStore();
+  const { me, projects, createProject, refresh, joinProject } = useStore();
   const [showNew, setShowNew] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -585,6 +585,15 @@ export default function ProjectsHome() {
         <NewProjectModal
           onClose={() => setShowNew(false)}
           onCreate={(name, desc) => createProject(name, desc)}
+        />
+      )}
+      {showJoin && (
+        <JoinProjectModal
+          onClose={() => setShowJoin(false)}
+          onJoin={async (code) => {
+            const projectId = await joinProject(code);
+            router.push(`/projects/${projectId}`);
+          }}
         />
       )}
     </div>

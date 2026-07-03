@@ -75,7 +75,7 @@ def seeded_project(db: Session) -> Project:
     )
     db.add(user)
     db.flush()
-    project = Project(name="test-project-for-docs", admin_id="user-999")
+    project = Project(name="test-project-for-docs")
     db.add(project)
     db.flush()
     membership = ProjectMembership(

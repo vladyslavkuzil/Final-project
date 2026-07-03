@@ -8,11 +8,9 @@ from sqlalchemy import (
     Integer,
     BigInteger,
     Boolean,
-    ForeignKey,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 from src.core.base import Base
-from src.modules.auth.models import User
 
 
 class Project(Base):
@@ -34,5 +32,3 @@ class Project(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
     is_finished: Mapped[bool] = mapped_column(Boolean, default=False)
-    admin_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
-    admin: Mapped["User"] = relationship(foreign_keys=[admin_id])

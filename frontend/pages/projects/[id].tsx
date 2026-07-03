@@ -232,10 +232,12 @@ function FileSkeleton() {
 export default function ProjectDashboard() {
   const router = useRouter();
   const {
+    me,
     projects,
     loaded,
     deleteProject,
     leaveProject,
+    loadProjectById,
     loadProjectDocuments,
     deleteFile,
     renameFile,
@@ -243,15 +245,43 @@ export default function ProjectDashboard() {
     downloadFile,
     saveSettings,
     inviteByEmail,
+    generateJoinCode,
+    removeMember,
   } = useStore();
 
   const id = typeof router.query.id === "string" ? router.query.id : "";
+  const rawTab =
+    typeof router.query.tab === "string" ? router.query.tab : "files";
+  const tab: "files" | "members" | "chat" = [
+    "files",
+    "members",
+    "chat",
+  ].includes(rawTab)
+    ? (rawTab as "files" | "members" | "chat")
+    : "files";
+  const setTab = (t: "files" | "members" | "chat") =>
+    router.push(
+      { pathname: router.pathname, query: { ...router.query, tab: t } },
+      undefined,
+      { shallow: true },
+    );
   const project = projects.find((p) => p.id === id);
-
-  const [tab, setTab] = useState<"files" | "members" | "chat">("files");
   const [modal, setModal] = useState<"invite" | "settings" | null>(null);
   const [filesLoading, setFilesLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchMembers = (projectId: string) =>
+    api
+      .get<{
+        users: {
+          id: string;
+          email: string;
+          is_active: boolean;
+          role: string;
+        }[];
+      }>(`/project/${projectId}/members`)
+      .then((data) => setLiveMembers(data.users))
+      .catch(() => {});
 
   useEffect(() => {
     if (!getToken()) router.replace("/login");
@@ -270,6 +300,20 @@ export default function ProjectDashboard() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, !!project]);
+
+  // Fetch full project info (including the caller's role) from the detail endpoint.
+  useEffect(() => {
+    if (id) loadProjectById(id).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  // Refresh live members whenever the members tab is opened.
+  useEffect(() => {
+    if (tab === "members" && id) {
+      fetchMembers(id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, id]);
 
   if (!project) return null;
 
@@ -740,6 +784,7 @@ export default function ProjectDashboard() {
                     {/* Avatar + email */}
                     <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
                       <div
+                        key={m.id}
                         style={{
                           width: 30,
                           height: 30,
@@ -832,7 +877,11 @@ export default function ProjectDashboard() {
       {modal === "invite" && (
         <InviteModal
           onClose={() => setModal(null)}
-          onSend={(email) => inviteByEmail(project.id, email)}
+          onSend={async (email) => {
+            await inviteByEmail(project.id, email);
+            await fetchMembers(project.id);
+          }}
+          onGenerateCode={() => generateJoinCode(project.id)}
         />
       )}
       {modal === "settings" && (
@@ -840,6 +889,18 @@ export default function ProjectDashboard() {
           project={project}
           onClose={() => setModal(null)}
           onSave={(patch) => saveSettings(project.id, patch)}
+        />
+      )}
+      {memberToRemove && (
+        <ConfirmRemoveMemberModal
+          email={memberToRemove.email}
+          onClose={() => setMemberToRemove(null)}
+          onConfirm={async () => {
+            await removeMember(project.id, memberToRemove.id);
+            setLiveMembers((prev) =>
+              prev.filter((m) => m.id !== memberToRemove.id),
+            );
+          }}
         />
       )}
     </div>
