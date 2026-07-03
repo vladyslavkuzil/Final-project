@@ -691,6 +691,138 @@ export function ConfirmRemoveMemberModal({
   );
 }
 
+// ── Confirm Delete Project Modal ────────────────────────────────────────────
+export function ConfirmDeleteProjectModal({
+  projectName,
+  onClose,
+  onConfirm,
+}: {
+  projectName: string;
+  onClose: () => void;
+  onConfirm: () => Promise<void>;
+}) {
+  const { error, busy, submit } = useModalSubmit(
+    onConfirm,
+    onClose,
+    "Failed to delete project",
+  );
+
+  return (
+    <Modal maxWidth={400} onClose={onClose}>
+      <div style={{ marginBottom: 20 }}>
+        <div
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 8,
+            background: "rgba(235,87,87,0.08)",
+            border: "1px solid rgba(235,87,87,0.2)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 18,
+            marginBottom: 12,
+          }}
+        >
+          🗑
+        </div>
+        <h2
+          style={{
+            margin: "0 0 3px",
+            fontSize: 17,
+            fontWeight: 700,
+            letterSpacing: "-.3px",
+            color: notion.text,
+          }}
+        >
+          Delete "{projectName}"?
+        </h2>
+        <p style={{ margin: 0, fontSize: 13, color: notion.textMuted }}>
+          This cannot be undone. All files and data will be permanently removed.
+        </p>
+      </div>
+
+      <ModalDivider />
+
+      {error && <ErrorBanner message={error} />}
+
+      <ModalFooter
+        onClose={onClose}
+        busy={busy}
+        confirmLabel="Delete"
+        busyLabel="Deleting…"
+        onConfirm={submit}
+      />
+    </Modal>
+  );
+}
+
+// ── Confirm Leave Project Modal ─────────────────────────────────────────────
+export function ConfirmLeaveProjectModal({
+  projectName,
+  onClose,
+  onConfirm,
+}: {
+  projectName: string;
+  onClose: () => void;
+  onConfirm: () => Promise<void>;
+}) {
+  const { error, busy, submit } = useModalSubmit(
+    onConfirm,
+    onClose,
+    "Failed to leave project",
+  );
+
+  return (
+    <Modal maxWidth={400} onClose={onClose}>
+      <div style={{ marginBottom: 20 }}>
+        <div
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 8,
+            background: "rgba(235,87,87,0.08)",
+            border: "1px solid rgba(235,87,87,0.2)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 18,
+            marginBottom: 12,
+          }}
+        >
+          ⏻
+        </div>
+        <h2
+          style={{
+            margin: "0 0 3px",
+            fontSize: 17,
+            fontWeight: 700,
+            letterSpacing: "-.3px",
+            color: notion.text,
+          }}
+        >
+          Leave "{projectName}"?
+        </h2>
+        <p style={{ margin: 0, fontSize: 13, color: notion.textMuted }}>
+          You will lose access to its files and messages.
+        </p>
+      </div>
+
+      <ModalDivider />
+
+      {error && <ErrorBanner message={error} />}
+
+      <ModalFooter
+        onClose={onClose}
+        busy={busy}
+        confirmLabel="Yes, leave"
+        busyLabel="Leaving…"
+        onConfirm={submit}
+      />
+    </Modal>
+  );
+}
+
 // ── Join Project Modal ────────────────────────────────────────────────────────
 export function JoinProjectModal({
   onClose,

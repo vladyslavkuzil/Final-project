@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { ProjectChatPanel } from "../../components/chat/project-chat";
 import { Hov, notion } from "../../components/infoboard/ui";
-import { ConfirmRemoveMemberModal, InviteModal, SettingsModal } from "../../components/infoboard/modals";
+import { ConfirmDeleteProjectModal, ConfirmLeaveProjectModal, ConfirmRemoveMemberModal, InviteModal, SettingsModal } from "../../components/infoboard/modals";
 import { useStore, type FileItem } from "../../lib/store";
 import { api, getToken } from "../../lib/api";
 
@@ -270,6 +270,8 @@ export default function ProjectDashboard() {
   const [filesLoading, setFilesLoading] = useState(true);
   const [liveMembers, setLiveMembers] = useState<{ id: string; email: string; is_active: boolean; role: string }[]>([]);
   const [memberToRemove, setMemberToRemove] = useState<{ id: string; email: string } | null>(null);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchMembers = (projectId: string) =>
@@ -297,6 +299,7 @@ export default function ProjectDashboard() {
     if (id && project) {
       setFilesLoading(true);
       loadProjectDocuments(id)
+        .then((members) => setLiveMembers(members))
         .catch(() => {})
         .finally(() => setFilesLoading(false));
     }
@@ -306,12 +309,6 @@ export default function ProjectDashboard() {
   // Fetch full project info (including the caller's role) from the detail endpoint.
   useEffect(() => {
     if (id) loadProjectById(id).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
-
-  // Load members on mount so the sidebar counter is populated immediately.
-  useEffect(() => {
-    if (id) fetchMembers(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -341,17 +338,9 @@ export default function ProjectDashboard() {
     }
   };
 
-  const onDeleteProject = async () => {
-    if (!window.confirm(`Delete "${project.name}"? This cannot be undone.`)) return;
-    if (await runOrAlert(() => deleteProject(project.id), "Failed to delete project"))
-      router.push("/projects");
-  };
+  const onDeleteProject = () => setShowDeleteModal(true);
 
-  const onLeaveProject = async () => {
-    if (!window.confirm(`Leave "${project.name}"? You will lose access to its files.`)) return;
-    if (await runOrAlert(() => leaveProject(project.id), "Failed to leave project"))
-      router.push("/projects");
-  };
+  const onLeaveProject = () => setShowLeaveModal(true);
 
   const onRename = async (f: FileItem) => {
     const next = window.prompt("Rename document", f.name);
@@ -528,13 +517,17 @@ export default function ProjectDashboard() {
               <div>{project.size} used</div>
             </div>
 
-            <button
-              className="danger-btn"
-              onClick={isAdmin ? onDeleteProject : onLeaveProject}
-            >
-              <span style={{ fontSize: 13 }}>{isAdmin ? "🗑" : "⏻"}</span>
-              {isAdmin ? "Delete project" : "Leave project"}
-            </button>
+            {isAdmin ? (
+              <button className="danger-btn" onClick={onDeleteProject}>
+                <span style={{ fontSize: 13 }}>🗑</span>
+                Delete project
+              </button>
+            ) : (
+              <button className="danger-btn" onClick={onLeaveProject}>
+                <span style={{ fontSize: 13 }}>⏻</span>
+                Leave project
+              </button>
+            )}
           </div>
         </aside>
 
@@ -879,15 +872,16 @@ export default function ProjectDashboard() {
             </main>
           )}
 
-          {/* ── Chat tab ── */}
-          {tab === "chat" && (
-            <div className="tab-content" style={{ flex: 1, minHeight: 0 }}>
-              <ProjectChatPanel
-                projectId={project.id}
-                projectName={project.name}
-              />
-            </div>
-          )}
+          {/* ── Chat tab ── always mounted to preserve WS connection and avoid re-fetching history */}
+          <div
+            className="tab-content"
+            style={{ flex: 1, minHeight: 0, display: tab === "chat" ? undefined : "none" }}
+          >
+            <ProjectChatPanel
+              projectId={project.id}
+              projectName={project.name}
+            />
+          </div>
         </div>
       </div>
 
@@ -918,6 +912,26 @@ export default function ProjectDashboard() {
             setLiveMembers((prev) =>
               prev.filter((m) => m.id !== memberToRemove.id),
             );
+          }}
+        />
+      )}
+      {showDeleteModal && (
+        <ConfirmDeleteProjectModal
+          projectName={project.name}
+          onClose={() => setShowDeleteModal(false)}
+          onConfirm={async () => {
+            await deleteProject(project.id);
+            router.push("/projects");
+          }}
+        />
+      )}
+      {showLeaveModal && (
+        <ConfirmLeaveProjectModal
+          projectName={project.name}
+          onClose={() => setShowLeaveModal(false)}
+          onConfirm={async () => {
+            await leaveProject(project.id);
+            router.push("/projects");
           }}
         />
       )}
