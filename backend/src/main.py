@@ -24,13 +24,13 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["Content-Disposition"],
 )
-app.include_router(documents_router, prefix="/project/{project_id}/documents")
-app.include_router(auth_router)
-app.include_router(users_router)
-app.include_router(projects_router)
-app.include_router(project_membership_router)
-app.include_router(chat_router)
-app.include_router(ws_router)
+app.include_router(documents_router, prefix="/api/project/{project_id}/documents")
+app.include_router(auth_router, prefix="/api")
+app.include_router(users_router, prefix="/api")
+app.include_router(projects_router, prefix="/api")
+app.include_router(project_membership_router, prefix="/api")
+app.include_router(chat_router, prefix="/api")
+app.include_router(ws_router, prefix="/api")
 
 
 @app.get("/health")
