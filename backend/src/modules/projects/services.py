@@ -6,6 +6,7 @@ Handles all CRUD operations for projects.
 
 import json
 from pydantic import TypeAdapter
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from src.modules.auth.models import User
 from src.core.config import CACHE_TTL
@@ -22,6 +23,20 @@ from .exceptions import (
     UserNotFoundError,
     OwnerCannotLeaveError,
 )
+
+
+def get_project_owner(db: Session, project_id: str) -> ProjectMembership | None:
+    return db.scalar(
+        select(ProjectMembership).where(
+            ProjectMembership.project_id == project_id,
+            ProjectMembership.role == MembershipRole.OWNER,
+        )
+    )
+
+
+def get_project_owner_id(db: Session, project_id: str) -> str | None:
+    membership = get_project_owner(db, project_id)
+    return membership.user_id if membership else None
 
 
 def get_project_by_id(db: Session, project_id: str) -> Project | None:
@@ -64,9 +79,7 @@ def get_project_by_name_for_member(
     return project, membership.role
 
 
-def _create_project(
-    db: Session, name: str, description: str | None = None, admin_id: str = ""
-) -> Project:
+def _create_project(db: Session, name: str, description: str | None = None) -> Project:
     """Create a new project and return it refreshed from the database.
 
     Args:
@@ -88,7 +101,6 @@ def _create_project(
     project = Project(
         name=name,
         description=description,
-        admin_id=admin_id,
     )
     db.add(project)
     db.flush()
@@ -114,7 +126,7 @@ def create_project(
         UserNotFoundError: If the creator user is not found in the database.
     """
     try:
-        project = _create_project(db, name, description, admin_id=user_id)
+        project = _create_project(db, name, description)
         project_membership = ProjectMembership(
             project_id=project.id, user_id=user_id, role=MembershipRole.OWNER
         )
@@ -342,8 +354,6 @@ def leave_project(db: Session, project_id: str, user_id: str) -> None:
     project = db.query(Project).filter(Project.id == project_id).one_or_none()
     if project is None:
         raise ProjectNotFoundError(project_id)
-    if project.admin_id == user_id:
-        raise OwnerCannotLeaveError(project_id)
 
     membership = (
         db.query(ProjectMembership)
@@ -353,6 +363,8 @@ def leave_project(db: Session, project_id: str, user_id: str) -> None:
         )
         .one_or_none()
     )
+    if membership is not None and membership.role == MembershipRole.OWNER:
+        raise OwnerCannotLeaveError(project_id)
 
     # Capture the affected members before mutating so every member's cached
     # project list is invalidated, not just the leaver's.

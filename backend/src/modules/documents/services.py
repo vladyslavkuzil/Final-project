@@ -7,7 +7,20 @@ Handles all CRUD operations for project documents.
 import uuid
 from sqlalchemy.orm import Session
 from src.core.storage import StorageBackend
+from src.core.cache import redis_client
 from src.modules.documents.models import Document
+from src.modules.projects.models import Project
+from src.modules.project_membership.models import ProjectMembership
+
+
+def _invalidate_project_caches(db: Session, project_id: str) -> None:
+    user_ids = (
+        db.query(ProjectMembership.user_id)
+        .filter(ProjectMembership.project_id == project_id)
+        .all()
+    )
+    for (uid,) in user_ids:
+        redis_client.delete(f"user:{uid}:projects")
 
 
 def get_documents_by_project(db: Session, project_id: str) -> list[Document]:
@@ -33,7 +46,12 @@ def get_document(db: Session, document_id: str, project_id: str) -> Document | N
 
 
 def create_document(
-    db: Session, project_id: str, title: str, file_path: str, user_id: str
+    db: Session,
+    project_id: str,
+    title: str,
+    file_path: str,
+    user_id: str,
+    file_size: int = 0,
 ) -> Document:
     """Insert a new document row and return it refreshed from the database.
 
@@ -43,6 +61,7 @@ def create_document(
         title: Human-readable document title.
         file_path: Storage path or URI of the uploaded file.
         user_id: Identifier of the user performing the upload.
+        file_size: Size of the uploaded file in bytes.
 
     Returns:
         The newly created Document, refreshed from the database.
@@ -57,13 +76,19 @@ def create_document(
         file_path=file_path,
         project_id=project_id,
         uploaded_by=user_id,
+        size_bytes=file_size,
     )
     try:
         db.add(doc)
+        project = db.query(Project).filter(Project.id == project_id).one_or_none()
+        if project is not None:
+            project.documents_count += 1
+            project.total_size_bytes += file_size
         db.commit()
     except Exception:
         db.rollback()
         raise
+    _invalidate_project_caches(db, project_id)
     db.refresh(doc)
     return doc
 
@@ -100,12 +125,18 @@ def delete_document(
     if not doc:
         return False
     file_path = doc.file_path
+    file_size = doc.size_bytes
     try:
         db.delete(doc)
+        project = db.query(Project).filter(Project.id == project_id).one_or_none()
+        if project is not None:
+            project.documents_count = max(0, project.documents_count - 1)
+            project.total_size_bytes = max(0, project.total_size_bytes - file_size)
         db.commit()
     except Exception:
         db.rollback()
         raise
+    _invalidate_project_caches(db, project_id)
     # Remove the stored file only after the row is durably gone, so a commit
     # failure can't orphan a live document whose bytes have already been deleted.
     storage.delete(file_path)

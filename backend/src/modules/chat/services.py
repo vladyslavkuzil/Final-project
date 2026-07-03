@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from src.modules.chat.models import Message
 
 
@@ -16,11 +16,12 @@ def get_messages(project_id: str, offset: int, limit: int, db: Session):
         db (Session): The database session.
 
     Returns:
-        List[Message]: A list of messages for the project.
+        List[dict]: A list of messages with sender email for the project.
     """
     limit = min(limit, 100)
-    return (
+    messages = (
         db.query(Message)
+        .options(joinedload(Message.sender))
         .filter(Message.project_id == project_id)
         .filter(Message.deleted_at.is_(None))
         .order_by(Message.created_at.desc())
@@ -28,6 +29,17 @@ def get_messages(project_id: str, offset: int, limit: int, db: Session):
         .limit(limit)
         .all()
     )
+    return [
+        {
+            "id": m.id,
+            "project_id": m.project_id,
+            "sender_id": m.sender_id,
+            "sender_email": m.sender.email,
+            "content": m.content,
+            "created_at": str(m.created_at),
+        }
+        for m in messages
+    ]
 
 
 def create_message(project_id: str, user_id: str, content: str, db: Session):

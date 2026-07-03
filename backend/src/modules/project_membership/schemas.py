@@ -1,5 +1,4 @@
 from pydantic import AwareDatetime, BaseModel, EmailStr
-from src.modules.auth.schemas import UserResponse
 
 
 class JoinCodeCreateRequest(BaseModel):
@@ -28,5 +27,13 @@ class MemberRemoveResponse(BaseModel):
     message: str
 
 
+class MemberOut(BaseModel):
+    id: str
+    email: EmailStr
+    is_active: bool
+    role: str
+    model_config = {"from_attributes": True}
+
+
 class UsersListResponse(BaseModel):
-    users: list[UserResponse]
+    users: list[MemberOut]
