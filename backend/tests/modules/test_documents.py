@@ -359,9 +359,11 @@ def test_delete_document_unlinks_file_only_after_commit():
     from src.modules.documents import services
 
     db = Mock()
+    db.query.return_value.filter.return_value.one_or_none.return_value = None
     storage = Mock()
     doc = Mock()
     doc.file_path = "stored.pdf"
+    doc.size_bytes = 0
     # Record commit and delete on a shared parent so their relative order is visible.
     manager = Mock()
     manager.attach_mock(db.commit, "commit")
@@ -382,9 +384,11 @@ def test_delete_document_keeps_file_when_commit_fails():
 
     db = Mock()
     db.commit.side_effect = RuntimeError("boom")
+    db.query.return_value.filter.return_value.one_or_none.return_value = None
     storage = Mock()
     doc = Mock()
     doc.file_path = "stored.pdf"
+    doc.size_bytes = 0
 
     # Act / Assert — the error propagates, the file is NOT removed, and we roll back.
     with patch.object(services, "get_document", return_value=doc):
@@ -393,6 +397,75 @@ def test_delete_document_keeps_file_when_commit_fails():
 
     db.rollback.assert_called_once()
     storage.delete.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Project counter invariants — documents_count and total_size_bytes
+# ---------------------------------------------------------------------------
+
+
+def test_upload_increments_project_counters(
+    client: TestClient, db: Session, seeded_project: Project
+):
+    # Arrange
+    content = b"hello counter"
+
+    # Act
+    r = _upload(
+        client,
+        seeded_project.id,
+        title="Counter Doc",
+        filename="c.pdf",
+        content=content,
+    )
+    assert r.status_code == 201
+
+    # Assert
+    db.refresh(seeded_project)
+    assert seeded_project.documents_count == 1
+    assert seeded_project.total_size_bytes == len(content)
+
+
+def test_delete_decrements_project_counters(
+    client: TestClient, db: Session, seeded_project: Project
+):
+    # Arrange — upload a document so the counters are non-zero
+    content = b"bye counter"
+    r = _upload(
+        client,
+        seeded_project.id,
+        title="Del Counter Doc",
+        filename="d.pdf",
+        content=content,
+    )
+    assert r.status_code == 201
+    doc_id = r.json()["id"]
+
+    # Act
+    resp = client.delete(f"/project/{seeded_project.id}/documents/{doc_id}")
+    assert resp.status_code == 204
+
+    # Assert
+    db.refresh(seeded_project)
+    assert seeded_project.documents_count == 0
+    assert seeded_project.total_size_bytes == 0
+
+
+def test_multiple_uploads_accumulate_counters(
+    client: TestClient, db: Session, seeded_project: Project
+):
+    # Arrange
+    content_a = b"file one"
+    content_b = b"file two longer"
+
+    # Act
+    _upload(client, seeded_project.id, title="A", filename="a.pdf", content=content_a)
+    _upload(client, seeded_project.id, title="B", filename="b.pdf", content=content_b)
+
+    # Assert
+    db.refresh(seeded_project)
+    assert seeded_project.documents_count == 2
+    assert seeded_project.total_size_bytes == len(content_a) + len(content_b)
 
 
 # ---------------------------------------------------------------------------
