@@ -52,6 +52,7 @@ type ApiDocument = {
   title: string;
   file_path: string;
   uploaded_by: string;
+  size_bytes: number;
   created_at: string;
 };
 
@@ -217,7 +218,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         name: d.title,
         ext,
         color,
-        size: "—",
+        size: formatBytes(d.size_bytes ?? 0),
         by: emailMap[d.uploaded_by] ?? d.uploaded_by,
         date: formatDate(d.created_at),
       };

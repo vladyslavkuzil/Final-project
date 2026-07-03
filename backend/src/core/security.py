@@ -68,9 +68,6 @@ def verify_project_access(project_id: str, user_id: str, db: Session) -> bool:
     if project is None:
         return False
 
-    if project.admin_id == user_id:
-        return True
-
     membership = (
         db.query(ProjectMembership)
         .filter(
