@@ -136,7 +136,7 @@ resource "aws_ecs_task_definition" "frontend" {
       ]
 
       environment = [
-        { name = "NEXT_PUBLIC_API_URL", value = "http://${var.alb_dns_name}" },
+        { name = "NEXT_PUBLIC_API_URL", value = "http://${var.alb_dns_name}/api" },
         { name = "NEXT_TELEMETRY_DISABLED", value = "1" }
       ]
 
