@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { ProjectChatPanel } from "../../components/chat/project-chat";
 import { Hov, notion } from "../../components/infoboard/ui";
-import { InviteModal, SettingsModal } from "../../components/infoboard/modals";
+import { ConfirmRemoveMemberModal, InviteModal, SettingsModal } from "../../components/infoboard/modals";
 import { useStore, type FileItem } from "../../lib/store";
-import { getToken } from "../../lib/api";
+import { api, getToken } from "../../lib/api";
 
 // ── keyframe injection ────────────────────────────────────────────────────────
 if (typeof document !== "undefined") {
@@ -268,6 +268,8 @@ export default function ProjectDashboard() {
   const project = projects.find((p) => p.id === id);
   const [modal, setModal] = useState<"invite" | "settings" | null>(null);
   const [filesLoading, setFilesLoading] = useState(true);
+  const [liveMembers, setLiveMembers] = useState<{ id: string; email: string; is_active: boolean; role: string }[]>([]);
+  const [memberToRemove, setMemberToRemove] = useState<{ id: string; email: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchMembers = (projectId: string) =>
@@ -304,6 +306,12 @@ export default function ProjectDashboard() {
   // Fetch full project info (including the caller's role) from the detail endpoint.
   useEffect(() => {
     if (id) loadProjectById(id).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  // Load members on mount so the sidebar counter is populated immediately.
+  useEffect(() => {
+    if (id) fetchMembers(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -450,7 +458,7 @@ export default function ProjectDashboard() {
                 {project.name}
               </div>
               <div style={{ fontSize: 11.5, color: notion.textFaint, marginTop: 1 }}>
-                {project.members?.length ?? 0} member{(project.members?.length ?? 0) !== 1 ? "s" : ""}
+                {liveMembers.length} member{liveMembers.length !== 1 ? "s" : ""}
               </div>
             </div>
           </div>
@@ -767,9 +775,9 @@ export default function ProjectDashboard() {
                   overflow: "hidden",
                 }}
               >
-                {project.members.map((m, i) => (
+                {liveMembers.map((m, i) => (
                   <div
-                    key={m.email + i}
+                    key={m.id}
                     className="member-row"
                     style={{
                       display: "flex",
@@ -833,15 +841,15 @@ export default function ProjectDashboard() {
                             width: 6,
                             height: 6,
                             borderRadius: "50%",
-                            background: m.active ? "#4f8a5b" : "#d0a02b",
+                            background: m.is_active ? "#4f8a5b" : "#d0a02b",
                             display: "inline-block",
                             flexShrink: 0,
                           }}
                         />
-                        {m.active ? "Active" : "Pending"}
+                        {m.is_active ? "Active" : "Pending"}
                       </div>
 
-                      {m.role === "Admin" ? (
+                      {m.role === "owner" ? (
                         <Badge
                           label="Admin"
                           color={notion.accentBlue}

@@ -31,6 +31,7 @@ class DocumentResponse(BaseModel):
     file_path: str
     project_id: str
     uploaded_by: str | None
+    size_bytes: int
     created_at: datetime
     updated_at: datetime
 

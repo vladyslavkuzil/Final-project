@@ -531,6 +531,156 @@ export function InviteModal({
   );
 }
 
+// ── Confirm Remove Member Modal ───────────────────────────────────────────────
+export function ConfirmRemoveMemberModal({
+  email,
+  onClose,
+  onConfirm,
+}: {
+  email: string;
+  onClose: () => void;
+  onConfirm: () => Promise<void>;
+}) {
+  const { error, busy, submit } = useModalSubmit(onConfirm, onClose, "Failed to remove member");
+
+  return (
+    <Modal maxWidth={400} onClose={onClose}>
+      <div style={{ marginBottom: 20 }}>
+        <div
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 8,
+            background: "rgba(235,87,87,0.08)",
+            border: "1px solid rgba(235,87,87,0.2)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 18,
+            marginBottom: 12,
+          }}
+        >
+          🗑
+        </div>
+        <h2
+          style={{
+            margin: "0 0 3px",
+            fontSize: 17,
+            fontWeight: 700,
+            letterSpacing: "-.3px",
+            color: notion.text,
+          }}
+        >
+          Remove member
+        </h2>
+        <p style={{ margin: 0, fontSize: 13, color: notion.textMuted }}>
+          <strong style={{ color: notion.text }}>{email}</strong> will lose access to this project.
+        </p>
+      </div>
+
+      <ModalDivider />
+
+      {error && <ErrorBanner message={error} />}
+
+      <ModalFooter
+        onClose={onClose}
+        busy={busy}
+        confirmLabel="Remove"
+        busyLabel="Removing…"
+        onConfirm={submit}
+      />
+    </Modal>
+  );
+}
+
+// ── Join Project Modal ────────────────────────────────────────────────────────
+export function JoinProjectModal({
+  onClose,
+  onJoin,
+}: {
+  onClose: () => void;
+  onJoin: (code: string) => Promise<void>;
+}) {
+  const [code, setCode] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const { error, busy, submit } = useModalSubmit(
+    () => onJoin(code.trim()),
+    onClose,
+    "Failed to join project",
+  );
+
+  useEffect(() => {
+    setTimeout(() => inputRef.current?.focus(), 80);
+  }, []);
+
+  const join = () => {
+    if (!code.trim()) return;
+    submit();
+  };
+
+  return (
+    <Modal maxWidth={420} onClose={onClose}>
+      <div style={{ marginBottom: 20 }}>
+        <div
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 8,
+            background: notion.bgSubtle,
+            border: `1px solid ${notion.border}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 18,
+            marginBottom: 12,
+          }}
+        >
+          🔗
+        </div>
+        <h2
+          style={{
+            margin: "0 0 3px",
+            fontSize: 17,
+            fontWeight: 700,
+            letterSpacing: "-.3px",
+            color: notion.text,
+          }}
+        >
+          Join a project
+        </h2>
+        <p style={{ margin: 0, fontSize: 13, color: notion.textMuted }}>
+          Enter the invite code shared with you.
+        </p>
+      </div>
+
+      <ModalDivider />
+
+      <div style={{ marginBottom: 20 }}>
+        <FieldLabel required>Invite code</FieldLabel>
+        <input
+          ref={inputRef}
+          className="modal-input"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && join()}
+          placeholder="e.g. abc123"
+        />
+      </div>
+
+      {error && <ErrorBanner message={error} />}
+
+      <ModalFooter
+        onClose={onClose}
+        busy={busy}
+        confirmLabel="Join project"
+        busyLabel="Joining…"
+        onConfirm={join}
+      />
+    </Modal>
+  );
+}
+
 // ── Settings Modal ────────────────────────────────────────────────────────────
 export function SettingsModal({
   project,

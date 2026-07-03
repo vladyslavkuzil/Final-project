@@ -54,7 +54,9 @@ async def upload_document(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     stored_path = await storage.save(file)
-    return services.create_document(db, project_id, title, stored_path, access.user_id)
+    return services.create_document(
+        db, project_id, title, stored_path, access.user_id, file_size=file.size or 0
+    )
 
 
 @router.get("/{document_id}")

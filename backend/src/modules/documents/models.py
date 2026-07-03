@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import ForeignKey, String, DateTime, func
+from sqlalchemy import BigInteger, ForeignKey, String, DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column
 from src.core.base import Base
 
@@ -19,6 +19,7 @@ class Document(Base):
     uploaded_by: Mapped[str | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

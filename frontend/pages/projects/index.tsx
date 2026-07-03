@@ -343,6 +343,7 @@ export default function ProjectsHome() {
   const router = useRouter();
   const { me, projects, createProject, refresh, joinProject } = useStore();
   const [showNew, setShowNew] = useState(false);
+  const [showJoin, setShowJoin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -503,18 +504,16 @@ export default function ProjectsHome() {
 
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <button
-              disabled
-              title="Coming soon"
+              onClick={() => setShowJoin(true)}
               style={{
                 fontSize: 13,
                 fontWeight: 500,
-                color: notion.textFaint,
+                color: notion.textMuted,
                 background: "transparent",
                 border: `1px solid ${notion.border}`,
                 borderRadius: 4,
                 padding: "6px 12px",
-                cursor: "not-allowed",
-                opacity: 0.45,
+                cursor: "pointer",
                 fontFamily: "inherit",
               }}
             >
