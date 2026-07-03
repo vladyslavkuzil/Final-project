@@ -263,14 +263,128 @@ resource "aws_lambda_permission" "allow_s3_invoke_image_resize" {
   source_arn    = aws_s3_bucket.documents.arn
 }
 
-resource "aws_s3_bucket_notification" "documents_resize" {
+resource "aws_s3_bucket_notification" "documents" {
   bucket = aws_s3_bucket.documents.id
+
+  # Resize images
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.image_resize.arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "original/"
+    filter_suffix       = ".jpg"
+  }
 
   lambda_function {
     lambda_function_arn = aws_lambda_function.image_resize.arn
     events              = ["s3:ObjectCreated:*"]
     filter_prefix       = "original/"
+    filter_suffix       = ".jpeg"
   }
 
-  depends_on = [aws_lambda_permission.allow_s3_invoke_image_resize]
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.image_resize.arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "original/"
+    filter_suffix       = ".png"
+  }
+
+  # Calculate project size
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.size_calculator.arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "original/"
+  }
+
+  depends_on = [
+    aws_lambda_permission.allow_s3_invoke_image_resize,
+    aws_lambda_permission.allow_s3_invoke_size_calculator,
+  ]
+}
+
+# ─── LAMBDA: SIZE CALCULATOR ───────────────────────────────────────────────
+
+data "archive_file" "size_calculator_zip" {
+  type        = "zip"
+  source_dir  = "${path.module}/../../lambda/size_calculator/build"
+  output_path = "${path.module}/.terraform-build/size_calculator.zip"
+}
+
+resource "aws_iam_role" "size_calculator_lambda" {
+  name = "${var.project_name}-size-calculator-lambda"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = "sts:AssumeRole"
+
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "size_calculator_basic" {
+  role       = aws_iam_role.size_calculator_lambda.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_iam_role_policy" "size_calculator_s3" {
+  name = "${var.project_name}-size-calculator-s3"
+  role = aws_iam_role.size_calculator_lambda.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+
+    Statement = [
+      {
+        Effect = "Allow"
+
+        Action = [
+          "s3:GetObject",
+          "s3:ListBucket",
+          "s3:DeleteObject"
+        ]
+
+        Resource = [
+          aws_s3_bucket.documents.arn,
+          "${aws_s3_bucket.documents.arn}/*"
+        ]
+      }
+    ]
+  })
+}
+
+resource "aws_lambda_function" "size_calculator" {
+  function_name = "${var.project_name}-size-calculator"
+
+  role    = aws_iam_role.size_calculator_lambda.arn
+  handler = "handler.lambda_handler"
+  runtime = "python3.12"
+
+  timeout    = 30
+  memory_size = 512
+
+  filename         = data.archive_file.size_calculator_zip.output_path
+  source_code_hash = data.archive_file.size_calculator_zip.output_base64sha256
+
+  environment {
+    variables = {
+      MAX_PROJECT_SIZE_MB = "100"
+    }
+  }
+}
+
+resource "aws_lambda_permission" "allow_s3_invoke_size_calculator" {
+  statement_id  = "AllowS3InvokeSizeCalculator"
+
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.size_calculator.function_name
+
+  principal  = "s3.amazonaws.com"
+  source_arn = aws_s3_bucket.documents.arn
 }
