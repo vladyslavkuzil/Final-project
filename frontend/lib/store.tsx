@@ -211,6 +211,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       emailMap[u.id] = u.email;
     }
     setUserEmails(emailMap);
+    const totalBytes = docs.reduce((sum, d) => sum + (d.size_bytes ?? 0), 0);
     const files: FileItem[] = docs.map((d) => {
       const { ext, color } = fileMeta(d.file_path || d.title);
       return {
@@ -225,7 +226,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     });
     setProjects((ps) =>
       ps.map((p) =>
-        p.id === projectId ? { ...p, files, filesCount: files.length } : p,
+        p.id === projectId
+          ? { ...p, files, filesCount: files.length, size: formatBytes(totalBytes) }
+          : p,
       ),
     );
   };

@@ -7,8 +7,20 @@ Handles all CRUD operations for project documents.
 import uuid
 from sqlalchemy.orm import Session
 from src.core.storage import StorageBackend
+from src.core.cache import redis_client
 from src.modules.documents.models import Document
 from src.modules.projects.models import Project
+from src.modules.project_membership.models import ProjectMembership
+
+
+def _invalidate_project_caches(db: Session, project_id: str) -> None:
+    user_ids = (
+        db.query(ProjectMembership.user_id)
+        .filter(ProjectMembership.project_id == project_id)
+        .all()
+    )
+    for (uid,) in user_ids:
+        redis_client.delete(f"user:{uid}:projects")
 
 
 def get_documents_by_project(db: Session, project_id: str) -> list[Document]:
@@ -76,6 +88,7 @@ def create_document(
     except Exception:
         db.rollback()
         raise
+    _invalidate_project_caches(db, project_id)
     db.refresh(doc)
     return doc
 
@@ -123,6 +136,7 @@ def delete_document(
     except Exception:
         db.rollback()
         raise
+    _invalidate_project_caches(db, project_id)
     # Remove the stored file only after the row is durably gone, so a commit
     # failure can't orphan a live document whose bytes have already been deleted.
     storage.delete(file_path)

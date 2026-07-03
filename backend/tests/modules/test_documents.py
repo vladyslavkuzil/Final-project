@@ -360,6 +360,7 @@ def test_delete_document_unlinks_file_only_after_commit():
 
     db = Mock()
     db.query.return_value.filter.return_value.one_or_none.return_value = None
+    db.query.return_value.filter.return_value.all.return_value = []
     storage = Mock()
     doc = Mock()
     doc.file_path = "stored.pdf"

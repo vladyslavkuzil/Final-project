@@ -309,6 +309,12 @@ export default function ProjectDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  // Load members on mount so the sidebar counter is populated immediately.
+  useEffect(() => {
+    if (id) fetchMembers(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
   // Refresh live members whenever the members tab is opened.
   useEffect(() => {
     if (tab === "members" && id) {
@@ -452,7 +458,7 @@ export default function ProjectDashboard() {
                 {project.name}
               </div>
               <div style={{ fontSize: 11.5, color: notion.textFaint, marginTop: 1 }}>
-                {project.members?.length ?? 0} member{(project.members?.length ?? 0) !== 1 ? "s" : ""}
+                {liveMembers.length} member{liveMembers.length !== 1 ? "s" : ""}
               </div>
             </div>
           </div>
