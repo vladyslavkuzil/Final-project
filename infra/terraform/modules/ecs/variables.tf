@@ -97,3 +97,14 @@ variable "s3_bucket_name" {
   description = "S3 bucket name injected into the backend container"
   type        = string
 }
+
+variable "redis_host" {
+  description = "ElastiCache Redis endpoint hostname"
+  type        = string
+}
+
+variable "redis_port" {
+  description = "ElastiCache Redis port"
+  type        = number
+  default     = 6379
+}

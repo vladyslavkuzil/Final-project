@@ -85,3 +85,10 @@ variable "s3_bucket_name" {
   type        = string
   default     = ""
 }
+
+variable "redis_password" {
+  description = "Auth token for ElastiCache Redis (leave empty when transit encryption is disabled)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}

@@ -97,7 +97,9 @@ resource "aws_ecs_task_definition" "backend" {
         { name = "DATABASE_URL", value = var.database_url },
         { name = "SECRET_KEY", value = var.secret_key },
         { name = "ALGORITHM", value = var.algorithm },
-        { name = "S3_BUCKET_NAME", value = var.s3_bucket_name }
+        { name = "S3_BUCKET_NAME", value = var.s3_bucket_name },
+        { name = "REDIS_HOST", value = var.redis_host },
+        { name = "REDIS_PORT", value = tostring(var.redis_port) }
       ]
 
       logConfiguration = {

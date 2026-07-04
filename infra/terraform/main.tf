@@ -122,6 +122,43 @@ resource "aws_security_group" "rds" {
   tags = { Name = "${var.project_name}-rds-sg" }
 }
 
+# ─── SECURITY GROUP: REDIS ───────────────────────────────────────────────────
+# Only accepts Redis traffic from ECS — nothing else can reach the cache
+
+resource "aws_security_group" "redis" {
+  name        = "${var.project_name}-redis-sg"
+  description = "Allow Redis inbound only from ECS"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress {
+    description     = "Redis from ECS only"
+    from_port       = 6379
+    to_port         = 6379
+    protocol        = "tcp"
+    security_groups = [aws_security_group.ecs.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = { Name = "${var.project_name}-redis-sg" }
+}
+
+# ─── REDIS MODULE ───────────────────────────────────────────────────────────
+# ElastiCache Redis for caching. Lives in private subnets, reachable only from ECS.
+
+module "redis" {
+  source = "./modules/redis"
+
+  project_name      = var.project_name
+  subnet_ids        = module.vpc.private_subnet_ids
+  security_group_id = aws_security_group.redis.id
+}
+
 # ─── ALB MODULE ─────────────────────────────────────────────────────────────
 # Creates the load balancer, target groups, HTTP listener, and /api/* routing rule.
 # Must run before ECS so target group ARNs are available for service registration.
@@ -154,6 +191,9 @@ module "ecs" {
 
   alb_dns_name   = module.alb.alb_dns_name
   s3_bucket_name = aws_s3_bucket.documents.bucket
+
+  redis_host = module.redis.redis_endpoint
+  redis_port = module.redis.redis_port
 }
 
 # ─── S3: DOCUMENT STORAGE ───────────────────────────────────────────────────

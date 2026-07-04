@@ -41,3 +41,9 @@ frontend_image = "123456789.dkr.ecr.eu-north-1.amazonaws.com/final-project-front
 database_url = "postgresql+psycopg://project_user:change-me-strong-password@YOUR_RDS_ENDPOINT:5432/final_project"
 secret_key   = "change-me-jwt-secret-min-32-chars"
 algorithm    = "HS256"             # optional, this is the default
+
+# ─── REDIS ──────────────────────────────────────────────────────────────────
+# Leave empty when transit encryption is disabled (no-auth mode).
+# ElastiCache is provisioned automatically in the private subnets.
+
+redis_password = ""

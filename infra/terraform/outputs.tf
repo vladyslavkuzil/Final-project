@@ -91,3 +91,13 @@ output "alb_dns_name" {
 output "documents_bucket_name" {
   value = aws_s3_bucket.documents.bucket
 }
+
+output "redis_endpoint" {
+  description = "DNS hostname of the ElastiCache Redis node"
+  value       = module.redis.redis_endpoint
+}
+
+output "redis_sg_id" {
+  description = "Security group ID for Redis"
+  value       = aws_security_group.redis.id
+}
