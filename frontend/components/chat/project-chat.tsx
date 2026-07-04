@@ -176,9 +176,11 @@ if (typeof document !== "undefined") {
 // ── helpers ───────────────────────────────────────────────────────────────────
 function buildWebSocketUrl(projectId: string, token: string): string {
   const url = new URL(getApiBaseUrl());
+
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-  url.pathname = `/ws/projects/${encodeURIComponent(projectId)}`;
-  url.search   = `token=${encodeURIComponent(token)}`;
+  url.pathname = `${url.pathname.replace(/\/$/, "")}/ws/projects/${encodeURIComponent(projectId)}`;
+  url.search = `token=${encodeURIComponent(token)}`;
+
   return url.toString();
 }
 
