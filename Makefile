@@ -11,6 +11,10 @@ build-image-resize:
 	mkdir -p lambda/image_resize/build
 	cp lambda/image_resize/handler.py lambda/image_resize/build/
 	$(PYTHON) -m pip install \
+		--platform manylinux2014_x86_64 \
+		--implementation cp \
+		--python-version 3.12 \
+		--only-binary=:all: \
 		-r lambda/image_resize/requirements.txt \
 		-t lambda/image_resize/build
 
