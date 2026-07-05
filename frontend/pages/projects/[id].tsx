@@ -911,7 +911,7 @@ export default function ProjectDashboard() {
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept=".pdf,.docx,.xlsx,.txt"
+                      accept=".pdf,.docx,.xlsx,.txt,.jpg,.jpeg,.png,.gif,.bmp,.tiff"
                       onChange={onPickFile}
                       style={{ display: "none" }}
                     />
