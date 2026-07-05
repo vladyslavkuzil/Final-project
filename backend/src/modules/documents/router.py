@@ -53,7 +53,7 @@ async def upload_document(
         validate_file_path(file.filename or "")
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
-    stored_path = await storage.save(file)
+    stored_path = await storage.save(file, project_id)
     return services.create_document(
         db, project_id, title, stored_path, access.user_id, file_size=file.size or 0
     )

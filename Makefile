@@ -2,7 +2,7 @@
 
 PYTHON ?= python3.12
 
-TF=cd infra/terraform && ./terraform
+TF=cd ./infra/terraform && terraform
 
 # ── Terraform ────────────────────────────────────────────────────────────────
 build-image-resize:
@@ -23,7 +23,13 @@ build-size-calculator:
 		-r lambda/size_calculator/requirements.txt \
 		-t lambda/size_calculator/build
 
-build-lambda: build-image-resize build-size-calculator
+build-dispatcher:
+	@echo "Building dispatcher..."
+	rm -rf lambda/lambda_dispatcher/build
+	mkdir -p lambda/lambda_dispatcher/build
+	cp lambda/lambda_dispatcher/handler.py lambda/lambda_dispatcher/build/
+
+build-lambda: build-image-resize build-size-calculator build-dispatcher
 
 tf-plan: build-lambda
 	$(TF) plan

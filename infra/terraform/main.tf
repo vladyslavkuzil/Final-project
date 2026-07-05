@@ -14,12 +14,12 @@ module "vpc" {
 module "database" {
   source = "./modules/database"
 
-  project_name = var.project_name
+  project_name          = var.project_name
   db_subnet_group_name  = module.vpc.db_subnet_group_name
   rds_security_group_id = aws_security_group.rds.id
-  db_name     = "final_project"
-  db_username = var.db_username
-  db_password = var.db_password
+  db_name               = "final_project"
+  db_username           = var.db_username
+  db_password           = var.db_password
 
   multi_az                = false # set to true for production
   deletion_protection     = false # set to true for production
@@ -55,7 +55,7 @@ resource "aws_security_group" "alb" {
   egress {
     from_port   = 0
     to_port     = 0
-    protocol    = "-1"  # -1 means all protocols
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -109,7 +109,7 @@ resource "aws_security_group" "rds" {
     from_port       = 5432
     to_port         = 5432
     protocol        = "tcp"
-    security_groups = [aws_security_group.ecs.id]  # ← chaining again
+    security_groups = [aws_security_group.ecs.id]
   }
 
   egress {
@@ -226,6 +226,94 @@ resource "aws_s3_bucket_public_access_block" "documents" {
   restrict_public_buckets = true
 }
 
+# ─── LAMBDA: DISPATCHER ─────────────────────────────────────────────────────
+# Triggered by S3 upload, invokes both image_resize and size_calculator
+
+data "archive_file" "dispatcher_zip" {
+  type        = "zip"
+  source_dir  = "${path.module}/../../lambda/lambda_dispatcher/build"
+  output_path = "${path.module}/.terraform-build/lambda_dispatcher.zip"
+}
+
+resource "aws_iam_role" "dispatcher_lambda" {
+  name = "${var.project_name}-dispatcher-lambda"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "lambda.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "dispatcher_basic" {
+  role       = aws_iam_role.dispatcher_lambda.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_iam_role_policy" "dispatcher_invoke" {
+  name = "${var.project_name}-dispatcher-invoke"
+  role = aws_iam_role.dispatcher_lambda.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = "lambda:InvokeFunction"
+      Resource = [
+        aws_lambda_function.image_resize.arn,
+        aws_lambda_function.size_calculator.arn
+      ]
+    }]
+  })
+}
+
+resource "aws_lambda_function" "dispatcher" {
+  function_name = "${var.project_name}-dispatcher"
+  role          = aws_iam_role.dispatcher_lambda.arn
+  handler       = "handler.lambda_handler"
+  runtime       = "python3.12"
+  timeout       = 30
+  memory_size   = 128
+
+  filename         = data.archive_file.dispatcher_zip.output_path
+  source_code_hash = data.archive_file.dispatcher_zip.output_base64sha256
+
+  environment {
+    variables = {
+      IMAGE_RESIZE_FUNCTION_NAME    = aws_lambda_function.image_resize.function_name
+      SIZE_CALCULATOR_FUNCTION_NAME = aws_lambda_function.size_calculator.function_name
+    }
+  }
+}
+
+resource "aws_lambda_permission" "allow_s3_invoke_dispatcher" {
+  statement_id  = "AllowS3InvokeDispatcher"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.dispatcher.function_name
+  principal     = "s3.amazonaws.com"
+  source_arn    = aws_s3_bucket.documents.arn
+}
+
+# ─── S3 BUCKET NOTIFICATION ─────────────────────────────────────────────────
+# Single rule — dispatcher handles fan-out to image_resize and size_calculator
+
+resource "aws_s3_bucket_notification" "documents" {
+  bucket = aws_s3_bucket.documents.id
+
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.dispatcher.arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "original/"
+  }
+
+  depends_on = [
+    aws_lambda_permission.allow_s3_invoke_dispatcher,
+  ]
+}
+
 # ─── LAMBDA: IMAGE RESIZE ───────────────────────────────────────────────────
 
 data "archive_file" "image_resize_zip" {
@@ -296,52 +384,6 @@ resource "aws_lambda_function" "image_resize" {
   }
 }
 
-resource "aws_lambda_permission" "allow_s3_invoke_image_resize" {
-  statement_id  = "AllowS3InvokeImageResize"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.image_resize.function_name
-  principal     = "s3.amazonaws.com"
-  source_arn    = aws_s3_bucket.documents.arn
-}
-
-resource "aws_s3_bucket_notification" "documents" {
-  bucket = aws_s3_bucket.documents.id
-
-  # Resize images
-  lambda_function {
-    lambda_function_arn = aws_lambda_function.image_resize.arn
-    events              = ["s3:ObjectCreated:*"]
-    filter_prefix       = "original/"
-    filter_suffix       = ".jpg"
-  }
-
-  lambda_function {
-    lambda_function_arn = aws_lambda_function.image_resize.arn
-    events              = ["s3:ObjectCreated:*"]
-    filter_prefix       = "original/"
-    filter_suffix       = ".jpeg"
-  }
-
-  lambda_function {
-    lambda_function_arn = aws_lambda_function.image_resize.arn
-    events              = ["s3:ObjectCreated:*"]
-    filter_prefix       = "original/"
-    filter_suffix       = ".png"
-  }
-
-  # Calculate project size
-  lambda_function {
-    lambda_function_arn = aws_lambda_function.size_calculator.arn
-    events              = ["s3:ObjectCreated:*"]
-    filter_prefix       = "original/"
-  }
-
-  depends_on = [
-    aws_lambda_permission.allow_s3_invoke_image_resize,
-    aws_lambda_permission.allow_s3_invoke_size_calculator,
-  ]
-}
-
 # ─── LAMBDA: SIZE CALCULATOR ───────────────────────────────────────────────
 
 data "archive_file" "size_calculator_zip" {
@@ -355,12 +397,10 @@ resource "aws_iam_role" "size_calculator_lambda" {
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
-
     Statement = [
       {
         Effect = "Allow"
         Action = "sts:AssumeRole"
-
         Principal = {
           Service = "lambda.amazonaws.com"
         }
@@ -380,17 +420,14 @@ resource "aws_iam_role_policy" "size_calculator_s3" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-
     Statement = [
       {
         Effect = "Allow"
-
         Action = [
           "s3:GetObject",
           "s3:ListBucket",
           "s3:DeleteObject"
         ]
-
         Resource = [
           aws_s3_bucket.documents.arn,
           "${aws_s3_bucket.documents.arn}/*"
@@ -402,13 +439,11 @@ resource "aws_iam_role_policy" "size_calculator_s3" {
 
 resource "aws_lambda_function" "size_calculator" {
   function_name = "${var.project_name}-size-calculator"
-
-  role    = aws_iam_role.size_calculator_lambda.arn
-  handler = "handler.lambda_handler"
-  runtime = "python3.12"
-
-  timeout    = 30
-  memory_size = 512
+  role          = aws_iam_role.size_calculator_lambda.arn
+  handler       = "handler.lambda_handler"
+  runtime       = "python3.12"
+  timeout       = 30
+  memory_size   = 512
 
   filename         = data.archive_file.size_calculator_zip.output_path
   source_code_hash = data.archive_file.size_calculator_zip.output_base64sha256
@@ -418,14 +453,4 @@ resource "aws_lambda_function" "size_calculator" {
       MAX_PROJECT_SIZE_MB = "100"
     }
   }
-}
-
-resource "aws_lambda_permission" "allow_s3_invoke_size_calculator" {
-  statement_id  = "AllowS3InvokeSizeCalculator"
-
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.size_calculator.function_name
-
-  principal  = "s3.amazonaws.com"
-  source_arn = aws_s3_bucket.documents.arn
 }
