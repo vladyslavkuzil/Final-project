@@ -252,14 +252,15 @@ if (typeof document !== "undefined") {
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function buildWebSocketUrl(projectId: string, token: string): string {
-  const url = new URL(getApiBaseUrl());
+  const url = new URL("/api", window.location.origin);
 
-  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-  url.pathname = `${url.pathname.replace(/\/$/, "")}/ws/projects/${encodeURIComponent(projectId)}`;
+  url.protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  url.pathname = `/api/ws/projects/${encodeURIComponent(projectId)}`;
   url.search = `token=${encodeURIComponent(token)}`;
 
   return url.toString();
 }
+
 
 // Best-effort decode of the JWT payload to recover the current user's id.
 // Falls back gracefully (returns null) for opaque/non-JWT tokens — the app
