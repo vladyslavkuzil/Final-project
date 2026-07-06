@@ -1,7 +1,7 @@
 // Central API client: a thin fetch wrapper that attaches the Bearer token
 // from localStorage on every request and normalizes error handling.
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
 
 const TOKEN_KEY = "access_token";
 const EMAIL_KEY = "user_email";
