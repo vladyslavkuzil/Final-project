@@ -97,11 +97,9 @@ A project has many chat messages; a message belongs to exactly one project.
 projects (1) ──< messages
 ```
 
-- `messages.project_id → users.id` — no `ON DELETE` behavior currently
-  specified (defaults to `RESTRICT`/`NO ACTION`). This is inconsistent with
-  `documents.project_id` (`CASCADE`) and is flagged as a follow-up: a
-  project delete should likely cascade-delete its messages too, for
-  consistency with how `documents` behaves.
+- `messages.project_id → projects.id`, `ON DELETE CASCADE` (migration
+  `2131e43c0dda`, follow-up from PR #31 now resolved: deleting a project
+  deletes its messages too, consistent with how `documents` behaves).
 
 ### `users` ↔ `messages` (one-to-many)
 
@@ -112,7 +110,10 @@ users (1) ──< messages
 ```
 
 - `messages.sender_id → users.id` — no `ON DELETE` behavior currently
-  specified. Same follow-up note as above applies.
+  specified (defaults to `RESTRICT`/`NO ACTION`); a user who has ever sent a
+  message cannot currently be deleted while that message exists. Unlike
+  `documents.uploaded_by`, this hasn't been changed to `SET NULL` — still
+  flagged as a follow-up.
 
 ## Denormalized fields (intentional, documented)
 
@@ -122,12 +123,11 @@ respectively) that are cached directly on `projects` to avoid a join +
 aggregate on every dashboard read. This is a deliberate normalization
 trade-off for read performance, not an oversight.
 
-**Known issue (tracked separately, not fixed in PR #31):** the service
-layer does not currently update these two fields when documents are
-created or deleted, so they can drift out of sync with the real document
-set. Fixing this requires adding a `size_bytes` column to `Document` to
-track the byte delta on upload/delete, which is out of scope for this
-normalization pass and is filed as a follow-up.
+**Resolved:** the service layer (`documents/services.py`) now increments
+both fields on upload and decrements them on delete, in the same
+transaction as the `Document` row change, so they stay in sync with the
+real document set. (Previously tracked as a known gap, not fixed in
+PR #31 — now fixed.)
 
 ## Summary of source-of-truth decisions
 
@@ -136,4 +136,4 @@ normalization pass and is filed as a follow-up.
 | Who owns a project | `project_membership.role = OWNER` | `projects.admin_id` removed in PR #31 — was a duplicate. |
 | Who is a member of a project | `project_membership` rows | — |
 | Who uploaded a document | `documents.uploaded_by` (nullable) | Cleared, not cascaded, on uploader deletion. |
-| Project document count / size | `projects.documents_count` / `total_size_bytes` | Deliberately denormalized cache; currently not kept in sync (follow-up ticket). |
+| Project document count / size | `projects.documents_count` / `total_size_bytes` | Denormalized cache, actively maintained by `documents/services.py` on upload/delete. |
