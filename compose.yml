@@ -96,8 +96,8 @@ services:
 
   frontend:
     profiles: [dev]
-    build:
-      context: ./frontend
+    image: node:20-alpine
+    working_dir: /app
     container_name: project-dashboard-frontend
     command: sh -c "npm install && npm run dev"
     volumes:
