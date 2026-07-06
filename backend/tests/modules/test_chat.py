@@ -220,7 +220,7 @@ def test_project_chat_ws_broadcasts_message(client: TestClient):
         ) as create_message,
     ):
         with client.websocket_connect(
-            "/ws/projects/project-1?token=test-token"
+            "/api/ws/projects/project-1?token=test-token"
         ) as websocket:
             websocket.send_text('{"type":"message","content":"hello from websocket"}')
             data = websocket.receive_json()
