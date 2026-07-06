@@ -10,9 +10,15 @@ type ChatMessage = {
   sender_email: string;
   content: string;
   created_at: string;
+  // client-only state, never sent by the server
+  _pending?: boolean;
+  _failed?: boolean;
 };
 
 type ConnectionStatus = "connecting" | "connected" | "disconnected";
+
+const MAX_MESSAGE_LENGTH = 4000;
+const PENDING_TIMEOUT_MS = 10_000;
 
 // ── keyframe injection ────────────────────────────────────────────────────────
 if (typeof document !== "undefined") {
@@ -34,6 +40,16 @@ if (typeof document !== "undefined") {
         50%       { opacity: 0.4; }
       }
 
+      @media (prefers-reduced-motion: reduce) {
+        .chat-message-left.new,
+        .chat-message-right.new {
+          animation: none !important;
+        }
+        .status-dot.connecting {
+          animation: none !important;
+        }
+      }
+
       /* ── Other people's messages (left) ── */
       .chat-message-left {
         transition: background 100ms ease;
@@ -52,6 +68,9 @@ if (typeof document !== "undefined") {
       .chat-message-right.new {
         animation: ib-msg-in-right 0.25s cubic-bezier(0.16,1,0.3,1) forwards;
       }
+      .chat-message-right:hover .chat-grouped-time {
+        opacity: 1 !important;
+      }
 
       /* ── Bubble ── */
       .chat-bubble-mine {
@@ -66,9 +85,19 @@ if (typeof document !== "undefined") {
         max-width: 100%;
         display: inline-block;
         box-shadow: 0 1px 3px rgba(35,131,226,0.25);
+        transition: opacity 150ms ease;
       }
       .chat-bubble-mine.grouped {
         border-radius: 14px 14px 4px 14px;
+      }
+      .chat-bubble-mine.pending {
+        opacity: 0.6;
+      }
+      .chat-bubble-mine.failed {
+        background: ${notion.bgSubtle};
+        color: ${notion.text};
+        border: 1px solid #e2a03f;
+        box-shadow: none;
       }
 
       .chat-bubble-other {
@@ -101,8 +130,10 @@ if (typeof document !== "undefined") {
         font-family: inherit;
         background: transparent;
         line-height: 1.5;
+        overflow-y: auto;
       }
       .chat-textarea::placeholder { color: #c4c3be; }
+      .chat-textarea:disabled { cursor: not-allowed; opacity: 0.6; }
 
       /* ── Send button ── */
       .chat-send-btn {
@@ -130,6 +161,18 @@ if (typeof document !== "undefined") {
         box-shadow: 0 2px 8px rgba(35,131,226,0.3);
       }
       .chat-send-btn:disabled { opacity: 0.45; cursor: default; }
+
+      /* ── Focus visibility (a11y) ── */
+      .chat-send-btn:focus-visible,
+      .reconnect-btn:focus-visible,
+      .chat-retry-btn:focus-visible,
+      .chat-scroll-btn:focus-visible {
+        outline: 2px solid ${notion.accentBlue};
+        outline-offset: 2px;
+      }
+      .chat-textarea:focus-visible {
+        outline: none;
+      }
 
       /* ── Status dot ── */
       .status-dot {
@@ -160,6 +203,40 @@ if (typeof document !== "undefined") {
       }
       .reconnect-btn:hover { opacity: 0.75; }
 
+      .chat-retry-btn {
+        font-size: 11px;
+        font-weight: 600;
+        color: #b5720b;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        padding: 0;
+        font-family: inherit;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        margin-top: 2px;
+      }
+
+      /* ── Scroll-to-bottom button ── */
+      .chat-scroll-btn {
+        position: absolute;
+        bottom: 14px;
+        right: 14px;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: 1px solid ${notion.border};
+        background: #fff;
+        color: ${notion.textMuted};
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(15,15,15,0.1);
+        transition: transform 100ms ease, background 100ms ease;
+      }
+      .chat-scroll-btn:hover { transform: translateY(-1px); background: ${notion.bgSubtle}; }
+
       /* ── Scrollbar ── */
       .chat-list::-webkit-scrollbar { width: 6px; }
       .chat-list::-webkit-scrollbar-track { background: transparent; }
@@ -182,6 +259,22 @@ function buildWebSocketUrl(projectId: string, token: string): string {
   url.search = `token=${encodeURIComponent(token)}`;
 
   return url.toString();
+}
+
+// Best-effort decode of the JWT payload to recover the current user's id.
+// Falls back gracefully (returns null) for opaque/non-JWT tokens — the app
+// still works correctly without this, via the optimistic-send tracking below.
+function decodeJwtUserId(token: string): string | null {
+  try {
+    const [, payloadB64] = token.split(".");
+    if (!payloadB64) return null;
+    const json = atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/"));
+    const payload = JSON.parse(json) as Record<string, unknown>;
+    const candidate = payload.sub ?? payload.user_id ?? payload.id ?? payload.uid;
+    return typeof candidate === "string" ? candidate : null;
+  } catch {
+    return null;
+  }
 }
 
 function formatTime(iso: string): string {
@@ -216,6 +309,10 @@ function shouldGroup(a: ChatMessage, b: ChatMessage): boolean {
   return diff < 3 * 60 * 1000;
 }
 
+function genTempId(): string {
+  return `pending-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
 // ── sub-components ────────────────────────────────────────────────────────────
 function DateDivider({ label }: { label: string }) {
   return (
@@ -234,11 +331,13 @@ function MessageRow({
   grouped,
   isNew,
   isMine,
+  onRetry,
 }: {
   message: ChatMessage;
   grouped: boolean;
   isNew: boolean;
   isMine: boolean;
+  onRetry: (tempId: string) => void;
 }) {
   if (isMine) {
     // ── My message — right-aligned blue bubble ──────────────────────────────
@@ -263,20 +362,31 @@ function MessageRow({
               marginRight: 2,
             }}
           >
-            You · {formatTime(message.created_at)}
+            You · {message._failed ? "not sent" : formatTime(message.created_at)}
           </span>
         )}
 
         <div
-          className={`chat-bubble-mine${grouped ? " grouped" : ""}`}
+          className={`chat-bubble-mine${grouped ? " grouped" : ""}${message._pending ? " pending" : ""}${message._failed ? " failed" : ""}`}
           style={{ maxWidth: "68%" }}
         >
           {message.content}
         </div>
 
-        {/* Subtle timestamp on grouped messages — visible on hover via parent */}
-        {grouped && (
+        {message._failed && (
+          <button
+            type="button"
+            className="chat-retry-btn"
+            onClick={() => onRetry(message.id)}
+          >
+            Couldn't send · Retry
+          </button>
+        )}
+
+        {/* Subtle timestamp on grouped messages — visible on hover of the row */}
+        {grouped && !message._failed && (
           <span
+            className="chat-grouped-time"
             style={{
               fontSize: 10.5,
               color: notion.textFaint,
@@ -285,9 +395,8 @@ function MessageRow({
               opacity: 0,
               transition: "opacity 150ms ease",
             }}
-            className="chat-grouped-time"
           >
-            {formatTime(message.created_at)}
+            {message._pending ? "Sending…" : formatTime(message.created_at)}
           </span>
         )}
       </div>
@@ -371,6 +480,8 @@ function StatusPill({
         color: notion.textMuted,
         background: notion.bgSubtle,
       }}
+      role="status"
+      aria-live="polite"
     >
       <span className={`status-dot ${status}`} />
       {status === "connected"  && "Connected"}
@@ -400,18 +511,22 @@ export function ProjectChatPanel({
   const [draft,    setDraft]    = useState("");
   const [status,   setStatus]   = useState<ConnectionStatus>("connecting");
   const [error,    setError]    = useState("");
-  const [sending,  setSending]  = useState(false);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
 
-  // We identify "my" messages by matching sender_id against the first message
-  // we send — or by storing the current user id from the token if available.
-  // For now we track it via the first message whose sender_id we own.
+  // Ids of messages authored by the current user — populated both from the
+  // decoded auth token (works across devices/tabs) and from confirmed sends
+  // (works even if the token can't be decoded).
+  const [ownIds, setOwnIds] = useState<Set<string>>(new Set());
   const myIdRef = useRef<string | null>(null);
 
-  const socketRef   = useRef<WebSocket | null>(null);
-  const listRef     = useRef<HTMLDivElement>(null);
-  const retryRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const retryCount  = useRef(0);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const socketRef    = useRef<WebSocket | null>(null);
+  const listRef       = useRef<HTMLDivElement>(null);
+  const retryRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryCount    = useRef(0);
+  const textareaRef   = useRef<HTMLTextAreaElement>(null);
+  // tempId -> timeout handle, so we can mark a pending send as failed if it's
+  // never echoed back within PENDING_TIMEOUT_MS.
+  const pendingTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   // ── connection ──────────────────────────────────────────────────────────────
   const connect = useCallback(() => {
@@ -421,6 +536,8 @@ export function ProjectChatPanel({
       setError("Sign in to use chat.");
       return;
     }
+
+    myIdRef.current = decodeJwtUserId(token);
 
     setStatus("connecting");
     setError("");
@@ -446,10 +563,40 @@ export function ProjectChatPanel({
           payload.created_at
         ) {
           const msg = payload as ChatMessage;
+
           setMessages((prev) => {
             if (prev.some((m) => m.id === msg.id)) return prev;
+
+            // If this echoes a message we just sent optimistically, replace
+            // the pending placeholder instead of appending a duplicate.
+            const pendingIdx = prev.findIndex(
+              (m) => m._pending && m.content === msg.content && m.id.startsWith("pending-")
+            );
+            if (pendingIdx !== -1) {
+              const tempId = prev[pendingIdx].id;
+              const timer = pendingTimersRef.current.get(tempId);
+              if (timer) clearTimeout(timer);
+              pendingTimersRef.current.delete(tempId);
+
+              setOwnIds((ids) => {
+                const next = new Set(ids);
+                next.delete(tempId);
+                next.add(msg.id);
+                return next;
+              });
+
+              const copy = prev.slice();
+              copy[pendingIdx] = msg;
+              return copy;
+            }
+
+            if (myIdRef.current && msg.sender_id === myIdRef.current) {
+              setOwnIds((ids) => new Set(ids).add(msg.id));
+            }
+
             return [...prev, msg];
           });
+
           setNewIds((prev) => new Set(prev).add(msg.id));
           setTimeout(() => {
             setNewIds((prev) => {
@@ -470,6 +617,16 @@ export function ProjectChatPanel({
 
     socket.onclose = () => {
       setStatus("disconnected");
+
+      // Any message still pending when the socket drops has no chance of
+      // being echoed back — surface it as failed immediately rather than
+      // waiting out the timeout.
+      setMessages((prev) =>
+        prev.map((m) => (m._pending ? { ...m, _pending: false, _failed: true } : m))
+      );
+      pendingTimersRef.current.forEach((t) => clearTimeout(t));
+      pendingTimersRef.current.clear();
+
       const delay = Math.min(1000 * 2 ** retryCount.current, 30_000);
       retryCount.current += 1;
       retryRef.current = setTimeout(connect, delay);
@@ -479,23 +636,28 @@ export function ProjectChatPanel({
   useEffect(() => {
     let cancelled = false;
     setMessages([]);
+    setOwnIds(new Set());
     setError("");
 
     api
       .get<ChatMessage[]>(`/chat/${projectId}/messages`)
       .then((history) => {
         if (cancelled) return;
-        setMessages(
-          Array.isArray(history)
-            ? history
-                .slice()
-                .sort(
-                  (a, b) =>
-                    new Date(a.created_at).getTime() -
-                    new Date(b.created_at).getTime()
-                )
-            : []
-        );
+        const sorted = Array.isArray(history)
+          ? history
+              .slice()
+              .sort(
+                (a, b) =>
+                  new Date(a.created_at).getTime() -
+                  new Date(b.created_at).getTime()
+              )
+          : [];
+        setMessages(sorted);
+        if (myIdRef.current) {
+          setOwnIds(
+            new Set(sorted.filter((m) => m.sender_id === myIdRef.current).map((m) => m.id))
+          );
+        }
       })
       .catch(() => {
         if (!cancelled) setError("Could not load chat history.");
@@ -506,37 +668,114 @@ export function ProjectChatPanel({
     return () => {
       cancelled = true;
       if (retryRef.current) clearTimeout(retryRef.current);
+      pendingTimersRef.current.forEach((t) => clearTimeout(t));
+      pendingTimersRef.current.clear();
       socketRef.current?.close();
       socketRef.current = null;
     };
   }, [projectId, connect]);
 
-  // Auto-scroll
+  // Auto-scroll, and surface a "jump to latest" affordance when scrolled up.
   useEffect(() => {
     const el = listRef.current;
     if (!el) return;
     const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
-    if (isNearBottom) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    if (isNearBottom) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      setShowJumpToLatest(false);
+    } else {
+      setShowJumpToLatest(true);
+    }
   }, [messages]);
 
-  // ── send ────────────────────────────────────────────────────────────────────
-  const sendMessage = () => {
-    const text = draft.trim();
-    if (!text || sending) return;
+  const handleListScroll = () => {
+    const el = listRef.current;
+    if (!el) return;
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    setShowJumpToLatest(!isNearBottom);
+  };
 
+  const jumpToLatest = () => {
+    const el = listRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    setShowJumpToLatest(false);
+  };
+
+  // Auto-grow the textarea with content, capped by CSS max-height.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }, [draft]);
+
+  // ── send ────────────────────────────────────────────────────────────────────
+  const dispatchSend = useCallback((tempId: string, text: string) => {
     const socket = socketRef.current;
     if (!socket || socket.readyState !== WebSocket.OPEN) {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...m, _pending: false, _failed: true } : m))
+      );
       setError("Chat is not connected yet.");
       return;
     }
 
-    setSending(true);
-    setError("");
     socket.send(JSON.stringify({ type: "message", content: text }));
+
+    const timer = setTimeout(() => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId && m._pending ? { ...m, _pending: false, _failed: true } : m))
+      );
+      pendingTimersRef.current.delete(tempId);
+    }, PENDING_TIMEOUT_MS);
+    pendingTimersRef.current.set(tempId, timer);
+  }, []);
+
+  const sendMessage = () => {
+    const text = draft.trim();
+    if (!text) return;
+
+    if (text.length > MAX_MESSAGE_LENGTH) {
+      setError(`Message is too long (max ${MAX_MESSAGE_LENGTH.toLocaleString()} characters).`);
+      return;
+    }
+
+    setError("");
+
+    const tempId = genTempId();
+    const optimisticMessage: ChatMessage = {
+      id: tempId,
+      project_id: projectId,
+      sender_id: myIdRef.current ?? "me",
+      sender_email: "you",
+      content: text,
+      created_at: new Date().toISOString(),
+      _pending: true,
+    };
+
+    setMessages((prev) => [...prev, optimisticMessage]);
+    setOwnIds((ids) => new Set(ids).add(tempId));
     setDraft("");
-    setSending(false);
     textareaRef.current?.focus();
+
+    dispatchSend(tempId, text);
   };
+
+  const retrySend = (tempId: string) => {
+    const failed = messages.find((m) => m.id === tempId);
+    if (!failed) return;
+
+    setMessages((prev) =>
+      prev.map((m) => (m.id === tempId ? { ...m, _pending: true, _failed: false } : m))
+    );
+    setError("");
+    dispatchSend(tempId, failed.content);
+  };
+
+  const remaining = MAX_MESSAGE_LENGTH - draft.length;
+  const showCounter = remaining < 200;
+  const composerDisabled = status !== "connected";
 
   // ── render ──────────────────────────────────────────────────────────────────
   return (
@@ -589,85 +828,94 @@ export function ProjectChatPanel({
       </div>
 
       {/* Message list */}
-      <div
-        ref={listRef}
-        className="chat-list"
-        style={{
-          flex: 1,
-          minHeight: 0,
-          overflowY: "auto",
-          background: notion.bgPage,
-          border: `1px solid ${notion.border}`,
-          borderRadius: 6,
-          padding: "14px 12px",
-        }}
-      >
-        {messages.length === 0 ? (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              minHeight: 240,
-              gap: 10,
-              animation: "ib-fade-in 0.4s ease forwards",
-            }}
-          >
+      <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
+        <div
+          ref={listRef}
+          className="chat-list"
+          onScroll={handleListScroll}
+          style={{
+            height: "100%",
+            overflowY: "auto",
+            background: notion.bgPage,
+            border: `1px solid ${notion.border}`,
+            borderRadius: 6,
+            padding: "14px 12px",
+          }}
+        >
+          {messages.length === 0 ? (
             <div
               style={{
-                width: 44,
-                height: 44,
-                borderRadius: 10,
-                background: notion.bgSubtle,
-                border: `1.5px dashed ${notion.borderStrong}`,
                 display: "flex",
+                flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: 20,
+                minHeight: 240,
+                gap: 10,
+                animation: "ib-fade-in 0.4s ease forwards",
               }}
             >
-              💬
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 10,
+                  background: notion.bgSubtle,
+                  border: `1.5px dashed ${notion.borderStrong}`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 20,
+                }}
+              >
+                💬
+              </div>
+              <p style={{ margin: 0, fontSize: 13.5, color: notion.textFaint }}>
+                No messages yet. Say hello!
+              </p>
             </div>
-            <p style={{ margin: 0, fontSize: 13.5, color: notion.textFaint }}>
-              No messages yet. Say hello!
-            </p>
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            {messages.map((msg, i) => {
-              const prev = messages[i - 1];
-              const grouped = !!prev && shouldGroup(prev, msg);
-              const isNew   = newIds.has(msg.id);
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              {messages.map((msg, i) => {
+                const prev = messages[i - 1];
+                const grouped = !!prev && shouldGroup(prev, msg);
+                const isNew   = newIds.has(msg.id);
+                const isMine  = ownIds.has(msg.id);
 
-              // Determine ownership — first time we see a sender_id that
-              // matches a message the server echoes back after we send,
-              // we store it. A cleaner approach is to decode the JWT or
-              // pass the current user id as a prop.
-              const isMine = myIdRef.current
-                ? msg.sender_id === myIdRef.current
-                : false;
+                const showDivider =
+                  !prev ||
+                  new Date(prev.created_at).toDateString() !==
+                    new Date(msg.created_at).toDateString();
 
-              const showDivider =
-                !prev ||
-                new Date(prev.created_at).toDateString() !==
-                  new Date(msg.created_at).toDateString();
+                return (
+                  <div key={msg.id}>
+                    {showDivider && (
+                      <DateDivider label={formatDateDivider(msg.created_at)} />
+                    )}
+                    <MessageRow
+                      message={msg}
+                      grouped={grouped}
+                      isNew={isNew}
+                      isMine={isMine}
+                      onRetry={retrySend}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
-              return (
-                <div key={msg.id}>
-                  {showDivider && (
-                    <DateDivider label={formatDateDivider(msg.created_at)} />
-                  )}
-                  <MessageRow
-                    message={msg}
-                    grouped={grouped}
-                    isNew={isNew}
-                    isMine={isMine}
-                  />
-                </div>
-              );
-            })}
-          </div>
+        {showJumpToLatest && messages.length > 0 && (
+          <button
+            type="button"
+            className="chat-scroll-btn"
+            onClick={jumpToLatest}
+            aria-label="Jump to latest messages"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
         )}
       </div>
 
@@ -713,32 +961,36 @@ export function ProjectChatPanel({
               sendMessage();
             }
           }}
-          placeholder="Write a message…  (Shift+Enter for new line)"
+          placeholder={
+            composerDisabled
+              ? "Reconnecting…"
+              : "Write a message…  (Shift+Enter for new line)"
+          }
           rows={1}
+          disabled={composerDisabled}
+          maxLength={MAX_MESSAGE_LENGTH}
+          aria-label="Message"
           style={{ minHeight: 36, maxHeight: 160 }}
         />
         <button
           className="chat-send-btn"
           onClick={sendMessage}
-          disabled={sending || !draft.trim()}
+          disabled={composerDisabled || !draft.trim()}
+          aria-label="Send message"
         >
-          {sending ? (
-            <Spinner size={12} color="rgba(255,255,255,0.4)" topColor="#fff" />
-          ) : (
-            <svg
-              width="14" height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="22" y1="2" x2="11" y2="13" />
-              <polygon points="22 2 15 22 11 13 2 9 22 2" />
-            </svg>
-          )}
-          {!sending && "Send"}
+          <svg
+            width="14" height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="22" y1="2" x2="11" y2="13" />
+            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+          </svg>
+          Send
         </button>
       </div>
 
@@ -752,7 +1004,9 @@ export function ProjectChatPanel({
           flexShrink: 0,
         }}
       >
-        Enter to send · Shift+Enter for new line
+        {showCounter
+          ? `${remaining} characters left`
+          : "Enter to send · Shift+Enter for new line"}
       </p>
     </section>
   );

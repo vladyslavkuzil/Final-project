@@ -24,7 +24,7 @@ _CHUNK_SIZE = 1024 * 1024
 class StorageBackend(Protocol):
     """Contract every storage backend must satisfy."""
 
-    async def save(self, file: UploadFile) -> str:
+    async def save(self, file: UploadFile, project_id: str) -> str:
         """Persist ``file`` and return the stored path/key."""
         ...
 
@@ -48,7 +48,7 @@ class LocalStorageBackend:
         self.base = Path(base_dir)
         self.base.mkdir(parents=True, exist_ok=True)
 
-    async def save(self, file: UploadFile) -> str:
+    async def save(self, file: UploadFile, project_id: str) -> str:
         ext = Path(file.filename or "").suffix
         stored_name = f"{uuid.uuid4().hex}{ext}"
         dest = self.base / stored_name
@@ -90,9 +90,9 @@ class S3StorageBackend:
         self.bucket = bucket
         self._s3 = boto3.client("s3")
 
-    async def save(self, file: UploadFile) -> str:
+    async def save(self, file: UploadFile, project_id: str) -> str:
         ext = Path(file.filename or "").suffix
-        key = f"{uuid.uuid4().hex}{ext}"
+        key = f"original/{project_id}/{uuid.uuid4().hex}{ext}"
         body = await file.read()
         await asyncio.to_thread(
             self._s3.put_object, Bucket=self.bucket, Key=key, Body=body

@@ -2,7 +2,18 @@ from datetime import datetime
 from pathlib import Path
 from pydantic import BaseModel, field_validator
 
-ALLOWED_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".txt"}
+ALLOWED_EXTENSIONS = {
+    ".pdf",
+    ".docx",
+    ".xlsx",
+    ".txt",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".bmp",
+    ".tiff",
+}
 
 
 def validate_file_path(value: str) -> str:

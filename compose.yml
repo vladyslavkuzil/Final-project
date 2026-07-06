@@ -115,7 +115,7 @@ services:
     container_name: project-dashboard-redis
     ports:
       - "6379:6379"
-    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-password}"]
+    command: ["redis-server"]
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-password}", "ping"]
       interval: 5s

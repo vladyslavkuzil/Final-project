@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { ProjectChatPanel } from "../../components/chat/project-chat";
-import { Hov, notion } from "../../components/infoboard/ui";
+import { notion } from "../../components/infoboard/ui";
 import {
   ConfirmDeleteProjectModal,
   ConfirmLeaveProjectModal,
@@ -11,6 +11,10 @@ import {
 } from "../../components/infoboard/modals";
 import { useStore, type FileItem } from "../../lib/store";
 import { api, getToken } from "../../lib/api";
+
+// Breakpoint below which the fixed sidebar gives way to a top bar + bottom
+// tab bar, and table-style rows collapse into stacked cards.
+const MOBILE_BP = 760;
 
 // ── keyframe injection ────────────────────────────────────────────────────────
 if (typeof document !== "undefined") {
@@ -32,6 +36,13 @@ if (typeof document !== "undefined") {
         100% { background-position:  400px 0; }
       }
 
+      @media (prefers-reduced-motion: reduce) {
+        .tab-content, .sidebar-in, .skeleton,
+        .file-row, .member-row {
+          animation: none !important;
+        }
+      }
+
       .skeleton {
         background: linear-gradient(
           90deg,
@@ -44,11 +55,12 @@ if (typeof document !== "undefined") {
         border-radius: 4px;
       }
 
-      /* Sidebar nav item */
+      /* Sidebar nav item — a reset button styled to look like the old <a> */
       .nav-item {
         display: flex;
         align-items: center;
         gap: 9px;
+        width: 100%;
         padding: 6px 8px;
         border-radius: 4px;
         font-size: 13.5px;
@@ -58,9 +70,17 @@ if (typeof document !== "undefined") {
         font-weight: 450;
         transition: background 120ms ease, color 120ms ease;
         user-select: none;
+        background: none;
+        border: none;
+        text-align: left;
+        font-family: inherit;
       }
       .nav-item:hover  { background: ${notion.hoverWash}; color: ${notion.text}; }
       .nav-item.active { background: ${notion.hoverWash}; color: ${notion.text}; font-weight: 600; }
+      .nav-item:focus-visible {
+        outline: 2px solid ${notion.accentBlue};
+        outline-offset: 1px;
+      }
 
       /* File row */
       .file-row { transition: background 100ms ease; }
@@ -81,9 +101,18 @@ if (typeof document !== "undefined") {
         font-size: 13px;
         color: ${notion.textMuted};
         transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+        flex-shrink: 0;
       }
       .icon-btn:hover { background: ${notion.bgSubtle}; border-color: ${notion.border}; color: ${notion.text}; }
       .icon-btn.danger:hover { background: #fdf2f1; border-color: #e8b9b3; color: #c0392b; }
+      .icon-btn:focus-visible,
+      .primary-btn:focus-visible,
+      .danger-btn:focus-visible,
+      .mobile-tab:focus-visible,
+      .dropdown-item:focus-visible {
+        outline: 2px solid ${notion.accentBlue};
+        outline-offset: 1px;
+      }
 
       /* Primary button */
       .primary-btn {
@@ -93,6 +122,7 @@ if (typeof document !== "undefined") {
         padding: 6px 13px; cursor: pointer;
         display: flex; align-items: center; gap: 6px;
         transition: background 150ms ease, transform 100ms ease, box-shadow 100ms ease;
+        white-space: nowrap;
       }
       .primary-btn:hover {
         background: #000;
@@ -123,6 +153,176 @@ if (typeof document !== "undefined") {
         opacity: 0;
         animation: fadeIn 0.35s ease 0.05s forwards;
       }
+
+      /* ── Main content padding — mobile-first, roomier on desktop ── */
+      .main-pad {
+        padding: 20px 16px calc(80px + env(safe-area-inset-bottom));
+      }
+
+      /* ── Responsive file rows: grid on desktop, stacked card on mobile ── */
+      .file-header-row,
+      .file-row {
+        display: grid;
+        grid-template-columns: 1fr 90px 180px 110px 96px;
+      }
+      .file-meta-mobile { display: none; }
+
+      .member-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        row-gap: 8px;
+      }
+
+      /* ── Mobile top bar + bottom tab bar: hidden on desktop ── */
+      .mobile-topbar, .mobile-tabbar, .mobile-tabbar-spacer {
+        display: none;
+      }
+
+      @media (max-width: ${MOBILE_BP}px) {
+        .app-sidebar-desktop { display: none !important; }
+
+        .main-pad {
+          padding: 16px 14px calc(72px + env(safe-area-inset-bottom));
+        }
+
+        .file-header-row { display: none; }
+        .file-row {
+          grid-template-columns: 1fr auto;
+          row-gap: 4px;
+          padding-top: 12px;
+          padding-bottom: 12px;
+        }
+        .file-cell-size, .file-cell-by, .file-cell-date { display: none; }
+        .file-meta-mobile {
+          display: block;
+          grid-column: 1 / -1;
+          font-size: 12px;
+          color: ${notion.textFaint};
+          margin-top: 2px;
+        }
+
+        .member-row .member-status-label { display: none; }
+
+        .mobile-topbar {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          height: 52px;
+          flex-shrink: 0;
+          padding: 0 10px;
+          background: ${notion.bgSidebar};
+          border-bottom: 1px solid ${notion.border};
+          position: sticky;
+          top: 0;
+          z-index: 20;
+        }
+        .mobile-topbar-title {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          min-width: 0;
+          flex: 1;
+        }
+        .mobile-topbar-avatar {
+          width: 24px; height: 24px;
+          border-radius: 6px;
+          display: flex; align-items: center; justify-content: center;
+          color: #fff; font-weight: 700; font-size: 11px;
+          flex-shrink: 0;
+        }
+        .mobile-topbar-name {
+          font-size: 14px;
+          font-weight: 600;
+          color: ${notion.text};
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .mobile-tabbar {
+          display: flex;
+          position: fixed;
+          left: 0; right: 0; bottom: 0;
+          height: calc(56px + env(safe-area-inset-bottom));
+          padding-bottom: env(safe-area-inset-bottom);
+          background: ${notion.bgSidebar};
+          border-top: 1px solid ${notion.border};
+          z-index: 20;
+        }
+        .mobile-tab {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 2px;
+          background: none;
+          border: none;
+          cursor: pointer;
+          font-family: inherit;
+          color: ${notion.textFaint};
+          font-size: 10.5px;
+          font-weight: 500;
+          position: relative;
+        }
+        .mobile-tab.active { color: ${notion.accentBlue}; }
+        .mobile-tab-icon { font-size: 18px; line-height: 1; }
+
+        .chat-tab-wrap > section {
+          height: calc(100vh - 52px - 56px - env(safe-area-inset-bottom)) !important;
+          padding: 16px 14px !important;
+        }
+      }
+
+      /* ── Dropdown ("more") menu ── */
+      .menu-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 25;
+      }
+      .dropdown-menu {
+        position: absolute;
+        top: calc(100% + 4px);
+        right: 0;
+        min-width: 220px;
+        background: ${notion.bgPage};
+        border: 1px solid ${notion.border};
+        border-radius: 8px;
+        box-shadow: 0 6px 20px rgba(15,15,15,0.12);
+        padding: 6px;
+        z-index: 26;
+      }
+      .dropdown-item {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13.5px;
+        font-family: inherit;
+        color: ${notion.text};
+        background: none;
+        border: none;
+        border-radius: 5px;
+        padding: 8px 9px;
+        cursor: pointer;
+        text-align: left;
+      }
+      .dropdown-item:hover { background: ${notion.hoverWash}; }
+      .dropdown-item.danger { color: ${notion.danger}; }
+      .dropdown-item.danger:hover { background: #fdf2f1; }
+      .dropdown-divider {
+        height: 1px;
+        background: ${notion.border};
+        margin: 5px 2px;
+      }
+      .dropdown-meta {
+        font-size: 11.5px;
+        color: ${notion.textFaint};
+        padding: 2px 9px 4px;
+        line-height: 1.6;
+      }
     `;
     document.head.appendChild(s);
   }
@@ -146,6 +346,12 @@ function avatarColor(seed: string): string {
     hash = seed.charCodeAt(i) + ((hash << 5) - hash);
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
+
+const NAV_TABS = [
+  { key: "files", icon: "▤", label: "Files" },
+  { key: "chat", icon: "💬", label: "Chat" },
+  { key: "members", icon: "◍", label: "Members" },
+] as const;
 
 // ── small shared components ───────────────────────────────────────────────────
 function Badge({
@@ -188,7 +394,9 @@ function SectionHeader({
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
+        gap: 12,
         marginBottom: 22,
+        flexWrap: "wrap",
       }}
     >
       <h1
@@ -214,9 +422,8 @@ function FileSkeleton() {
       {Array.from({ length: 4 }).map((_, i) => (
         <div
           key={i}
+          className="file-row"
           style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 90px 180px 110px 96px",
             gap: 12,
             padding: "12px 18px",
             borderBottom: `1px solid ${notion.border}`,
@@ -232,9 +439,9 @@ function FileSkeleton() {
             />
             <div className="skeleton" style={{ width: "60%", height: 13 }} />
           </div>
-          <div className="skeleton" style={{ width: 50, height: 13 }} />
-          <div className="skeleton" style={{ width: "70%", height: 13 }} />
-          <div className="skeleton" style={{ width: 70, height: 13 }} />
+          <div className="skeleton file-cell-size" style={{ width: 50, height: 13 }} />
+          <div className="skeleton file-cell-by" style={{ width: "70%", height: 13 }} />
+          <div className="skeleton file-cell-date" style={{ width: 70, height: 13 }} />
           <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
             <div
               className="skeleton"
@@ -300,6 +507,7 @@ export default function ProjectDashboard() {
   } | null>(null);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchMembers = (projectId: string) =>
@@ -347,6 +555,11 @@ export default function ProjectDashboard() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, id]);
+
+  // Close the mobile "more" menu whenever the tab changes.
+  useEffect(() => {
+    setMoreMenuOpen(false);
+  }, [tab]);
 
   if (!project) return null;
 
@@ -409,9 +622,9 @@ export default function ProjectDashboard() {
       }}
     >
       <div style={{ display: "flex", minHeight: "100vh" }}>
-        {/* ── Sidebar ── */}
+        {/* ── Sidebar (desktop only) ── */}
         <aside
-          className="sidebar-in"
+          className="sidebar-in app-sidebar-desktop"
           style={{
             width: 232,
             flexShrink: 0,
@@ -427,7 +640,8 @@ export default function ProjectDashboard() {
           }}
         >
           {/* Back link */}
-          <a
+          <button
+            type="button"
             className="nav-item"
             onClick={() => router.push("/projects")}
             style={{
@@ -438,7 +652,7 @@ export default function ProjectDashboard() {
           >
             <span style={{ fontSize: 11 }}>←</span>
             All projects
-          </a>
+          </button>
 
           {/* Project identity block */}
           <div
@@ -497,17 +711,13 @@ export default function ProjectDashboard() {
 
           {/* Nav */}
           <nav style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            {(
-              [
-                { key: "files", icon: "▤", label: "Files" },
-                { key: "chat", icon: "💬", label: "Chat" },
-                { key: "members", icon: "◍", label: "Members" },
-              ] as const
-            ).map(({ key, icon, label }) => (
-              <a
+            {NAV_TABS.map(({ key, icon, label }) => (
+              <button
                 key={key}
+                type="button"
                 className={`nav-item${tab === key ? " active" : ""}`}
                 onClick={() => setTab(key)}
+                aria-current={tab === key ? "page" : undefined}
               >
                 <span
                   style={{
@@ -535,11 +745,12 @@ export default function ProjectDashboard() {
                     }}
                   />
                 )}
-              </a>
+              </button>
             ))}
 
             {isAdmin && (
-              <a
+              <button
+                type="button"
                 className="nav-item"
                 onClick={() => setModal("settings")}
                 style={{ marginTop: 4 }}
@@ -555,7 +766,7 @@ export default function ProjectDashboard() {
                   ⚙
                 </span>
                 Settings
-              </a>
+              </button>
             )}
           </nav>
 
@@ -575,12 +786,12 @@ export default function ProjectDashboard() {
             </div>
 
             {isAdmin ? (
-              <button className="danger-btn" onClick={onDeleteProject}>
+              <button type="button" className="danger-btn" onClick={onDeleteProject}>
                 <span style={{ fontSize: 13 }}>🗑</span>
                 Delete project
               </button>
             ) : (
-              <button className="danger-btn" onClick={onLeaveProject}>
+              <button type="button" className="danger-btn" onClick={onLeaveProject}>
                 <span style={{ fontSize: 13 }}>⏻</span>
                 Leave project
               </button>
@@ -597,12 +808,98 @@ export default function ProjectDashboard() {
             flexDirection: "column",
           }}
         >
+          {/* ── Mobile top bar ── */}
+          <header className="mobile-topbar">
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label="Back to all projects"
+              onClick={() => router.push("/projects")}
+            >
+              ‹
+            </button>
+            <div className="mobile-topbar-title">
+              <div
+                className="mobile-topbar-avatar"
+                style={{ background: avatarColor(project.name) }}
+              >
+                {projInitial}
+              </div>
+              <span className="mobile-topbar-name">{project.name}</span>
+            </div>
+            <div style={{ position: "relative" }}>
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label="Project options"
+                aria-haspopup="menu"
+                aria-expanded={moreMenuOpen}
+                onClick={() => setMoreMenuOpen((o) => !o)}
+              >
+                ⋯
+              </button>
+              {moreMenuOpen && (
+                <>
+                  <div
+                    className="menu-backdrop"
+                    onClick={() => setMoreMenuOpen(false)}
+                  />
+                  <div className="dropdown-menu" role="menu">
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="dropdown-item"
+                        onClick={() => {
+                          setModal("settings");
+                          setMoreMenuOpen(false);
+                        }}
+                      >
+                        ⚙ Settings
+                      </button>
+                    )}
+                    <div className="dropdown-meta">
+                      {liveMembers.length} member
+                      {liveMembers.length !== 1 ? "s" : ""} · Created{" "}
+                      {project.created} · {project.size} used
+                    </div>
+                    <div className="dropdown-divider" />
+                    {isAdmin ? (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="dropdown-item danger"
+                        onClick={() => {
+                          setMoreMenuOpen(false);
+                          onDeleteProject();
+                        }}
+                      >
+                        🗑 Delete project
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="dropdown-item danger"
+                        onClick={() => {
+                          setMoreMenuOpen(false);
+                          onLeaveProject();
+                        }}
+                      >
+                        ⏻ Leave project
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </header>
+
           {/* ── Files tab ── */}
           {tab === "files" && (
             <main
-              className="tab-content"
+              className="tab-content main-pad"
               style={{
-                padding: "32px 40px 90px",
                 maxWidth: 980,
                 width: "100%",
               }}
@@ -614,11 +911,12 @@ export default function ProjectDashboard() {
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept=".pdf,.docx,.xlsx,.txt"
+                      accept=".pdf,.docx,.xlsx,.txt,.jpg,.jpeg,.png,.gif,.bmp,.tiff"
                       onChange={onPickFile}
                       style={{ display: "none" }}
                     />
                     <button
+                      type="button"
                       className="primary-btn"
                       onClick={() => fileInputRef.current?.click()}
                     >
@@ -637,11 +935,10 @@ export default function ProjectDashboard() {
                   overflow: "hidden",
                 }}
               >
-                {/* Table header */}
+                {/* Table header (hidden on mobile) */}
                 <div
+                  className="file-header-row"
                   style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 90px 180px 110px 96px",
                     gap: 12,
                     padding: "9px 18px",
                     borderBottom: `1px solid ${notion.border}`,
@@ -668,8 +965,6 @@ export default function ProjectDashboard() {
                       key={f.name + i}
                       className="file-row"
                       style={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr 90px 180px 110px 96px",
                         gap: 12,
                         padding: "10px 18px",
                         borderBottom: `1px solid ${notion.border}`,
@@ -679,13 +974,14 @@ export default function ProjectDashboard() {
                         animation: `fadeSlideIn 0.3s ease ${i * 0.04}s forwards`,
                       }}
                     >
-                      {/* Name + ext badge */}
+                      {/* Name + ext badge (+ mobile meta line) */}
                       <div
                         style={{
                           display: "flex",
                           alignItems: "center",
                           gap: 10,
                           minWidth: 0,
+                          flexWrap: "wrap",
                         }}
                       >
                         <span
@@ -710,14 +1006,21 @@ export default function ProjectDashboard() {
                             whiteSpace: "nowrap",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
+                            minWidth: 0,
                           }}
                         >
                           {f.name}
                         </span>
+                        <div className="file-meta-mobile">
+                          {f.size} · {f.by} · {f.date}
+                        </div>
                       </div>
 
-                      <span style={{ color: notion.textMuted }}>{f.size}</span>
+                      <span className="file-cell-size" style={{ color: notion.textMuted }}>
+                        {f.size}
+                      </span>
                       <span
+                        className="file-cell-by"
                         style={{
                           color: notion.textMuted,
                           whiteSpace: "nowrap",
@@ -727,7 +1030,9 @@ export default function ProjectDashboard() {
                       >
                         {f.by}
                       </span>
-                      <span style={{ color: notion.textMuted }}>{f.date}</span>
+                      <span className="file-cell-date" style={{ color: notion.textMuted }}>
+                        {f.date}
+                      </span>
 
                       {/* Actions */}
                       <div
@@ -738,23 +1043,29 @@ export default function ProjectDashboard() {
                         }}
                       >
                         <button
+                          type="button"
                           className="icon-btn"
                           title="Download"
+                          aria-label={`Download ${f.name}`}
                           onClick={() => onDownload(f)}
                         >
                           ↓
                         </button>
                         <button
+                          type="button"
                           className="icon-btn"
                           title="Rename"
+                          aria-label={`Rename ${f.name}`}
                           onClick={() => onRename(f)}
                         >
                           ✎
                         </button>
                         {isAdmin && (
                           <button
+                            type="button"
                             className="icon-btn danger"
                             title="Delete"
+                            aria-label={`Delete ${f.name}`}
                             onClick={() => onDelete(f)}
                           >
                             🗑
@@ -813,6 +1124,7 @@ export default function ProjectDashboard() {
                       </p>
                     </div>
                     <button
+                      type="button"
                       className="primary-btn"
                       onClick={() => fileInputRef.current?.click()}
                     >
@@ -828,9 +1140,8 @@ export default function ProjectDashboard() {
           {/* ── Members tab ── */}
           {tab === "members" && (
             <main
-              className="tab-content"
+              className="tab-content main-pad"
               style={{
-                padding: "32px 40px 90px",
                 maxWidth: 980,
                 width: "100%",
               }}
@@ -840,6 +1151,7 @@ export default function ProjectDashboard() {
                 action={
                   isAdmin ? (
                     <button
+                      type="button"
                       className="primary-btn"
                       onClick={() => setModal("invite")}
                     >
@@ -863,9 +1175,6 @@ export default function ProjectDashboard() {
                     key={m.id}
                     className="member-row"
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
                       padding: "11px 18px",
                       borderBottom: `1px solid ${notion.border}`,
                       opacity: 0,
@@ -874,10 +1183,14 @@ export default function ProjectDashboard() {
                   >
                     {/* Avatar + email */}
                     <div
-                      style={{ display: "flex", alignItems: "center", gap: 11 }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 11,
+                        minWidth: 0,
+                      }}
                     >
                       <div
-                        key={m.id}
                         style={{
                           width: 30,
                           height: 30,
@@ -894,17 +1207,29 @@ export default function ProjectDashboard() {
                       >
                         {initialOf(m.email)}
                       </div>
-                      <div>
+                      <div style={{ minWidth: 0 }}>
                         <div
                           style={{
                             fontSize: 13.5,
                             fontWeight: 500,
                             color: notion.text,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
                           }}
                         >
                           {m.email.split("@")[0]}
                         </div>
-                        <div style={{ fontSize: 12, color: notion.textFaint }}>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: notion.textFaint,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            maxWidth: 220,
+                          }}
+                        >
                           {m.email}
                         </div>
                       </div>
@@ -915,6 +1240,7 @@ export default function ProjectDashboard() {
                       style={{ display: "flex", alignItems: "center", gap: 12 }}
                     >
                       <div
+                        className="member-status-label"
                         style={{
                           display: "flex",
                           alignItems: "center",
@@ -952,8 +1278,10 @@ export default function ProjectDashboard() {
 
                       {isAdmin && m.role !== "owner" && m.email !== me && (
                         <button
+                          type="button"
                           className="icon-btn danger"
                           title="Remove member"
+                          aria-label={`Remove ${m.email}`}
                           onClick={() =>
                             setMemberToRemove({ id: m.id, email: m.email })
                           }
@@ -970,7 +1298,7 @@ export default function ProjectDashboard() {
 
           {/* ── Chat tab ── always mounted to preserve WS connection and avoid re-fetching history */}
           <div
-            className="tab-content"
+            className="tab-content chat-tab-wrap"
             style={{
               flex: 1,
               minHeight: 0,
@@ -982,6 +1310,22 @@ export default function ProjectDashboard() {
               projectName={project.name}
             />
           </div>
+
+          {/* ── Mobile bottom tab bar ── */}
+          <nav className="mobile-tabbar" aria-label="Project sections">
+            {NAV_TABS.map(({ key, icon, label }) => (
+              <button
+                key={key}
+                type="button"
+                className={`mobile-tab${tab === key ? " active" : ""}`}
+                onClick={() => setTab(key)}
+                aria-current={tab === key ? "page" : undefined}
+              >
+                <span className="mobile-tab-icon">{icon}</span>
+                <span className="mobile-tab-label">{label}</span>
+              </button>
+            ))}
+          </nav>
         </div>
       </div>
 
