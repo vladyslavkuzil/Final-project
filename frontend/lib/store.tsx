@@ -199,7 +199,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const current = getMyEmail();
     const data = await api.get<ApiProject>(`/project/by-id/${id}/info`);
     setProjects((ps) =>
-      ps.map((p) => (p.id === id ? mapProject(data, current) : p)),
+      ps.map((p) =>
+        p.id === id ? { ...mapProject(data, current), files: p.files } : p,
+      ),
     );
   };
 
