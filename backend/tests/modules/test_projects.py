@@ -359,7 +359,7 @@ class TestLeaveProjectEndpoint:
         auth_as("leave-part")
 
         # Act
-        response = client.post(f"/project/{project_with_members.id}/leave")
+        response = client.post(f"/api/project/{project_with_members.id}/leave")
 
         # Assert — success, and the participant's membership row is gone
         assert response.status_code == 204
@@ -380,7 +380,7 @@ class TestLeaveProjectEndpoint:
         auth_as("leave-owner")
 
         # Act
-        response = client.post(f"/project/{project_with_members.id}/leave")
+        response = client.post(f"/api/project/{project_with_members.id}/leave")
 
         # Assert — the owner cannot leave their own project
         assert response.status_code == 403
@@ -395,7 +395,7 @@ class TestLeaveProjectEndpoint:
         auth_as("leave-outsider")
 
         # Act
-        response = client.post(f"/project/{project_with_members.id}/leave")
+        response = client.post(f"/api/project/{project_with_members.id}/leave")
 
         # Assert — non-members are denied
         assert response.status_code == 403
@@ -406,7 +406,7 @@ class TestLeaveProjectEndpoint:
         # Arrange — no auth override applied, so the request carries no token
 
         # Act
-        response = client.post(f"/project/{project_with_members.id}/leave")
+        response = client.post(f"/api/project/{project_with_members.id}/leave")
 
         # Assert — unauthenticated requests are rejected
         assert response.status_code == 401

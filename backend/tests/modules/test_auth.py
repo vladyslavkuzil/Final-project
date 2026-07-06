@@ -22,7 +22,7 @@ TEST_PASSWORD = "strongpassword123"
 def registered_user(client: TestClient, db: Session) -> dict:
     """Register a user and return the response body."""
     r = client.post(
-        "/auth/register",
+        "/api/auth/register",
         json={"email": TEST_EMAIL, "password": TEST_PASSWORD},
     )
     assert r.status_code == 200
@@ -71,7 +71,7 @@ class TestRegister:
         payload = {"email": "newuser@example.com", "password": "securepass"}
 
         # Act
-        response = client.post("/auth/register", json=payload)
+        response = client.post("/api/auth/register", json=payload)
 
         # Assert
         assert response.status_code == 200
@@ -90,7 +90,7 @@ class TestRegister:
 
         # Act — try to register with the same email
         response = client.post(
-            "/auth/register",
+            "/api/auth/register",
             json={"email": TEST_EMAIL, "password": "anotherpass"},
         )
 
@@ -103,7 +103,7 @@ class TestRegister:
         payload = {"email": "not-an-email", "password": "securepass"}
 
         # Act
-        response = client.post("/auth/register", json=payload)
+        response = client.post("/api/auth/register", json=payload)
 
         # Assert
         assert response.status_code == 422
@@ -115,7 +115,7 @@ class TestRegister:
         payload = {"email": "valid@example.com"}
 
         # Act
-        response = client.post("/auth/register", json=payload)
+        response = client.post("/api/auth/register", json=payload)
 
         # Assert
         assert response.status_code == 422
@@ -134,7 +134,7 @@ class TestLogin:
 
         # Act
         response = client.post(
-            "/auth/login",
+            "/api/auth/login",
             data={"username": TEST_EMAIL, "password": TEST_PASSWORD},
         )
 
@@ -152,7 +152,7 @@ class TestLogin:
 
         # Act
         response = client.post(
-            "/auth/login",
+            "/api/auth/login",
             data={"username": TEST_EMAIL, "password": "wrongpassword"},
         )
 
@@ -164,7 +164,7 @@ class TestLogin:
 
         # Act
         response = client.post(
-            "/auth/login",
+            "/api/auth/login",
             data={"username": "ghost@example.com", "password": "any"},
         )
 
@@ -175,7 +175,7 @@ class TestLogin:
         # Arrange — empty form data
 
         # Act
-        response = client.post("/auth/login", data={})
+        response = client.post("/api/auth/login", data={})
 
         # Assert
         assert response.status_code == 422
@@ -189,11 +189,11 @@ class TestLogin:
 class TestFindUserByEmail:
     def _auth_header(self, client: TestClient) -> dict:
         client.post(
-            "/auth/register",
+            "/api/auth/register",
             json={"email": "finder@example.com", "password": TEST_PASSWORD},
         )
         r = client.post(
-            "/auth/login",
+            "/api/auth/login",
             data={"username": "finder@example.com", "password": TEST_PASSWORD},
         )
         return {"Authorization": f"Bearer {r.json()['access_token']}"}
@@ -204,7 +204,7 @@ class TestFindUserByEmail:
 
         # Act
         response = client.get(
-            "/users", params={"email": "finder@example.com"}, headers=headers
+            "/api/users", params={"email": "finder@example.com"}, headers=headers
         )
 
         # Assert
@@ -223,7 +223,7 @@ class TestFindUserByEmail:
 
         # Act
         response = client.get(
-            "/users", params={"email": "ghost@example.com"}, headers=headers
+            "/api/users", params={"email": "ghost@example.com"}, headers=headers
         )
 
         # Assert
@@ -231,7 +231,7 @@ class TestFindUserByEmail:
 
     def test_find_user_without_token_returns_401(self, client: TestClient, db: Session):
         # Act
-        response = client.get("/users", params={"email": "finder@example.com"})
+        response = client.get("/api/users", params={"email": "finder@example.com"})
 
         # Assert
         assert response.status_code == 401
@@ -270,14 +270,14 @@ class TestRefresh:
     ):
         # Arrange — login to get a refresh token
         login_response = client.post(
-            "/auth/login",
+            "/api/auth/login",
             data={"username": TEST_EMAIL, "password": TEST_PASSWORD},
         )
         refresh_token = login_response.json()["refresh_token"]
 
         # Act
         response = client.post(
-            "/auth/refresh",
+            "/api/auth/refresh",
             json={"refresh_token": refresh_token},
         )
 
@@ -295,14 +295,14 @@ class TestRefresh:
     ):
         # Arrange
         login_response = client.post(
-            "/auth/login",
+            "/api/auth/login",
             data={"username": TEST_EMAIL, "password": TEST_PASSWORD},
         )
         original = login_response.json()
 
         # Act
         response = client.post(
-            "/auth/refresh",
+            "/api/auth/refresh",
             json={"refresh_token": original["refresh_token"]},
         )
 
@@ -315,14 +315,14 @@ class TestRefresh:
     ):
         # Arrange — get an ACCESS token (not refresh)
         login_response = client.post(
-            "/auth/login",
+            "/api/auth/login",
             data={"username": TEST_EMAIL, "password": TEST_PASSWORD},
         )
         access_token = login_response.json()["access_token"]
 
         # Act — try to use the access token as a refresh token
         response = client.post(
-            "/auth/refresh",
+            "/api/auth/refresh",
             json={"refresh_token": access_token},
         )
 
@@ -337,7 +337,7 @@ class TestRefresh:
 
         # Act
         response = client.post(
-            "/auth/refresh",
+            "/api/auth/refresh",
             json={"refresh_token": garbage},
         )
 
@@ -346,7 +346,7 @@ class TestRefresh:
 
     def test_refresh_with_empty_body_returns_422(self, client: TestClient, db: Session):
         # Arrange / Act
-        response = client.post("/auth/refresh", json={})
+        response = client.post("/api/auth/refresh", json={})
 
         # Assert
         assert response.status_code == 422

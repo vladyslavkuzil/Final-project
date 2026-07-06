@@ -25,7 +25,7 @@ def save_file(backend: LocalStorageBackend, content: bytes, filename: str) -> st
     and runs the async save() to completion.
     """
     upload = UploadFile(filename=filename, file=BytesIO(content))
-    return asyncio.run(backend.save(upload))
+    return asyncio.run(backend.save(upload, "project-1"))
 
 
 def read_file(backend: LocalStorageBackend, key: str) -> bytes:

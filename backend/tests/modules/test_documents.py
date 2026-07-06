@@ -18,7 +18,7 @@ NONEXISTENT_DOCUMENT_ID = "does-not-exist-xyz"
 def _upload(client, project_id, *, title="Doc", filename="file.pdf", content=b"data"):
     """POST a multipart document upload, matching the real client contract."""
     return client.post(
-        f"/project/{project_id}/documents",
+        f"/api/project/{project_id}/documents",
         data={"title": title},
         files={"file": (filename, content, "application/octet-stream")},
     )
@@ -30,7 +30,7 @@ class InMemoryStorage:
     def __init__(self):
         self.files: dict[str, bytes] = {}
 
-    async def save(self, file):
+    async def save(self, file, project_id):
         stored = f"{uuid.uuid4().hex}{Path(file.filename or '').suffix}"
         self.files[stored] = await file.read()
         return stored
@@ -154,7 +154,7 @@ def test_list_documents_with_existing_doc_returns_200(
     # Arrange — document seeded via fixture
 
     # Act
-    response = client.get(f"/project/{seeded_project.id}/documents")
+    response = client.get(f"/api/project/{seeded_project.id}/documents")
 
     # Assert
     assert response.status_code == 200
@@ -212,7 +212,7 @@ def test_download_document_existing_id_returns_real_bytes(
     doc_id = r.json()["id"]
 
     # Act
-    response = client.get(f"/project/{seeded_project.id}/documents/{doc_id}")
+    response = client.get(f"/api/project/{seeded_project.id}/documents/{doc_id}")
 
     # Assert — the real stored bytes are streamed back
     assert response.status_code == 200
@@ -228,7 +228,7 @@ def test_download_document_disposition_uses_title_not_stored_path(
     stored_path = r.json()["file_path"]
 
     # Act
-    response = client.get(f"/project/{seeded_project.id}/documents/{doc_id}")
+    response = client.get(f"/api/project/{seeded_project.id}/documents/{doc_id}")
 
     # Assert — header exposes the title-based filename, never the stored key
     disposition = response.headers["content-disposition"]
@@ -243,7 +243,7 @@ def test_download_document_nonexistent_id_returns_404(
     doc_id = NONEXISTENT_DOCUMENT_ID
 
     # Act
-    response = client.get(f"/project/{seeded_project.id}/documents/{doc_id}")
+    response = client.get(f"/api/project/{seeded_project.id}/documents/{doc_id}")
 
     # Assert
     assert response.status_code == 404
@@ -258,7 +258,7 @@ def test_download_document_missing_file_returns_404(
     storage_override.delete(r.json()["file_path"])
 
     # Act
-    response = client.get(f"/project/{seeded_project.id}/documents/{doc_id}")
+    response = client.get(f"/api/project/{seeded_project.id}/documents/{doc_id}")
 
     # Assert — a clean 404, not a broken 200 stream
     assert response.status_code == 404
@@ -277,7 +277,7 @@ def test_update_document_valid_title_returns_200(
 
     # Act
     response = client.put(
-        f"/project/{seeded_project.id}/documents/{created_doc['id']}", json=payload
+        f"/api/project/{seeded_project.id}/documents/{created_doc['id']}", json=payload
     )
 
     # Assert
@@ -293,7 +293,7 @@ def test_update_document_disallowed_extension_returns_422(
 
     # Act
     response = client.put(
-        f"/project/{seeded_project.id}/documents/{created_doc['id']}", json=payload
+        f"/api/project/{seeded_project.id}/documents/{created_doc['id']}", json=payload
     )
 
     # Assert
@@ -308,7 +308,7 @@ def test_update_document_nonexistent_id_returns_404(
 
     # Act
     response = client.put(
-        f"/project/{seeded_project.id}/documents/{NONEXISTENT_DOCUMENT_ID}",
+        f"/api/project/{seeded_project.id}/documents/{NONEXISTENT_DOCUMENT_ID}",
         json=payload,
     )
 
@@ -328,14 +328,14 @@ def test_delete_document_existing_id_returns_204(
 
     # Act
     response = client.delete(
-        f"/project/{seeded_project.id}/documents/{created_doc['id']}"
+        f"/api/project/{seeded_project.id}/documents/{created_doc['id']}"
     )
 
     # Assert — 204 and a follow-up GET must confirm removal
     assert response.status_code == 204
     assert (
         client.get(
-            f"/project/{seeded_project.id}/documents/{created_doc['id']}"
+            f"/api/project/{seeded_project.id}/documents/{created_doc['id']}"
         ).status_code
         == 404
     )
@@ -348,7 +348,7 @@ def test_delete_document_nonexistent_id_returns_404(
     doc_id = NONEXISTENT_DOCUMENT_ID
 
     # Act
-    response = client.delete(f"/project/{seeded_project.id}/documents/{doc_id}")
+    response = client.delete(f"/api/project/{seeded_project.id}/documents/{doc_id}")
 
     # Assert
     assert response.status_code == 404
@@ -443,7 +443,7 @@ def test_delete_decrements_project_counters(
     doc_id = r.json()["id"]
 
     # Act
-    resp = client.delete(f"/project/{seeded_project.id}/documents/{doc_id}")
+    resp = client.delete(f"/api/project/{seeded_project.id}/documents/{doc_id}")
     assert resp.status_code == 204
 
     # Assert
@@ -487,7 +487,7 @@ def test_list_documents_without_token_returns_401(client: TestClient, no_auth):
     # Arrange — auth override removed via no_auth fixture
 
     # Act
-    response = client.get(f"/project/{NONEXISTENT_PROJECT_ID}/documents")
+    response = client.get(f"/api/project/{NONEXISTENT_PROJECT_ID}/documents")
 
     # Assert
     assert response.status_code == 401
@@ -499,7 +499,7 @@ def test_download_document_without_token_returns_401(
     # Arrange — auth override removed via no_auth fixture
 
     # Act
-    response = client.get(f"/project/{seeded_project.id}/documents/any-id")
+    response = client.get(f"/api/project/{seeded_project.id}/documents/any-id")
 
     # Assert
     assert response.status_code == 401
@@ -512,7 +512,7 @@ def test_update_document_without_token_returns_401(
 
     # Act
     response = client.put(
-        f"/project/{seeded_project.id}/documents/any-id", json={"title": "x"}
+        f"/api/project/{seeded_project.id}/documents/any-id", json={"title": "x"}
     )
 
     # Assert
@@ -525,7 +525,7 @@ def test_delete_document_without_token_returns_401(
     # Arrange — auth override removed via no_auth fixture
 
     # Act
-    response = client.delete(f"/project/{seeded_project.id}/documents/any-id")
+    response = client.delete(f"/api/project/{seeded_project.id}/documents/any-id")
 
     # Assert
     assert response.status_code == 401
@@ -552,7 +552,7 @@ def test_list_documents_nonexistent_project_returns_404(client: TestClient):
     # Arrange — no project with this ID exists
 
     # Act
-    response = client.get(f"/project/{NONEXISTENT_PROJECT_ID}/documents")
+    response = client.get(f"/api/project/{NONEXISTENT_PROJECT_ID}/documents")
 
     # Assert
     assert response.status_code == 404
@@ -571,7 +571,7 @@ def test_download_document_nonexistent_project_returns_404(client: TestClient):
 
     # Act
     response = client.get(
-        f"/project/{NONEXISTENT_PROJECT_ID}/documents/{NONEXISTENT_DOCUMENT_ID}"
+        f"/api/project/{NONEXISTENT_PROJECT_ID}/documents/{NONEXISTENT_DOCUMENT_ID}"
     )
 
     # Assert
@@ -581,7 +581,7 @@ def test_download_document_nonexistent_project_returns_404(client: TestClient):
 def test_update_document_nonexistent_project_returns_404(client: TestClient):
     # Act
     response = client.put(
-        f"/project/{NONEXISTENT_PROJECT_ID}/documents/{NONEXISTENT_DOCUMENT_ID}",
+        f"/api/project/{NONEXISTENT_PROJECT_ID}/documents/{NONEXISTENT_DOCUMENT_ID}",
         json={"title": "x"},
     )
 
@@ -592,7 +592,7 @@ def test_update_document_nonexistent_project_returns_404(client: TestClient):
 def test_delete_document_nonexistent_project_returns_404(client: TestClient):
     # Act
     response = client.delete(
-        f"/project/{NONEXISTENT_PROJECT_ID}/documents/{NONEXISTENT_DOCUMENT_ID}"
+        f"/api/project/{NONEXISTENT_PROJECT_ID}/documents/{NONEXISTENT_DOCUMENT_ID}"
     )
 
     # Assert
@@ -615,7 +615,7 @@ def test_no_access_user_cannot_list_documents(
     # Arrange — user has no membership in the project
 
     # Act
-    response = client.get(f"/project/{seeded_project.id}/documents")
+    response = client.get(f"/api/project/{seeded_project.id}/documents")
 
     # Assert
     assert response.status_code == 403
@@ -637,7 +637,9 @@ def test_no_access_user_cannot_download_document(
     # Arrange — document seeded by owner via fixture
 
     # Act
-    response = client.get(f"/project/{seeded_project.id}/documents/{created_doc['id']}")
+    response = client.get(
+        f"/api/project/{seeded_project.id}/documents/{created_doc['id']}"
+    )
 
     # Assert
     assert response.status_code == 403
@@ -651,7 +653,7 @@ def test_no_access_user_cannot_update_document(
 
     # Act
     response = client.put(
-        f"/project/{seeded_project.id}/documents/{created_doc['id']}",
+        f"/api/project/{seeded_project.id}/documents/{created_doc['id']}",
         json=payload,
     )
 
@@ -666,7 +668,7 @@ def test_no_access_user_cannot_delete_document(
 
     # Act
     response = client.delete(
-        f"/project/{seeded_project.id}/documents/{created_doc['id']}"
+        f"/api/project/{seeded_project.id}/documents/{created_doc['id']}"
     )
 
     # Assert
@@ -689,7 +691,7 @@ def test_participant_can_list_documents(
     # Arrange — participant membership seeded via fixture
 
     # Act
-    response = client.get(f"/project/{seeded_project.id}/documents")
+    response = client.get(f"/api/project/{seeded_project.id}/documents")
 
     # Assert
     assert response.status_code == 200
@@ -711,7 +713,9 @@ def test_participant_can_download_document(
     # Arrange — document seeded by owner via fixture
 
     # Act
-    response = client.get(f"/project/{seeded_project.id}/documents/{created_doc['id']}")
+    response = client.get(
+        f"/api/project/{seeded_project.id}/documents/{created_doc['id']}"
+    )
 
     # Assert
     assert response.status_code == 200
@@ -725,7 +729,7 @@ def test_participant_can_update_document(
 
     # Act
     response = client.put(
-        f"/project/{seeded_project.id}/documents/{created_doc['id']}",
+        f"/api/project/{seeded_project.id}/documents/{created_doc['id']}",
         json=payload,
     )
 
@@ -740,7 +744,7 @@ def test_participant_cannot_delete_document(
 
     # Act
     response = client.delete(
-        f"/project/{seeded_project.id}/documents/{created_doc['id']}"
+        f"/api/project/{seeded_project.id}/documents/{created_doc['id']}"
     )
 
     # Assert
@@ -758,16 +762,16 @@ def test_delete_project_removes_its_documents(
     # Arrange — document exists and is reachable
     doc_id = created_doc["id"]
     assert (
-        client.get(f"/project/{seeded_project.id}/documents/{doc_id}").status_code
+        client.get(f"/api/project/{seeded_project.id}/documents/{doc_id}").status_code
         == 200
     )
 
     # Act — delete the parent project
-    response = client.delete(f"/project/{seeded_project.id}")
+    response = client.delete(f"/api/project/{seeded_project.id}")
     assert response.status_code == 200
 
     # Assert — document is gone, no orphan remains
     assert (
-        client.get(f"/project/{seeded_project.id}/documents/{doc_id}").status_code
+        client.get(f"/api/project/{seeded_project.id}/documents/{doc_id}").status_code
         == 404
     )
