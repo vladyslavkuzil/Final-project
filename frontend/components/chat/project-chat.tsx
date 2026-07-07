@@ -252,9 +252,12 @@ if (typeof document !== "undefined") {
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function buildWebSocketUrl(projectId: string, token: string): string {
-  const url = new URL("/api", window.location.origin);
+  const apiBase =
+    process.env.NEXT_PUBLIC_API_URL ??
+    `${window.location.origin}/api`;
 
-  url.protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const url = new URL(apiBase);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
   url.pathname = `/api/ws/projects/${encodeURIComponent(projectId)}`;
   url.search = `token=${encodeURIComponent(token)}`;
 
