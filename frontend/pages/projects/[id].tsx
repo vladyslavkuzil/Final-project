@@ -39,8 +39,13 @@ if (typeof document !== "undefined") {
 
       @media (prefers-reduced-motion: reduce) {
         .tab-content, .sidebar-in, .skeleton,
-        .member-row {
+        .file-card, .file-card-grid > *, .member-row {
           animation: none !important;
+        }
+        /* No hover lift/scale for reduced-motion users. */
+        .file-card, .file-card:hover {
+          transition: none !important;
+          transform: none !important;
         }
       }
 
