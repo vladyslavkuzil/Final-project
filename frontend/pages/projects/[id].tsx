@@ -83,14 +83,13 @@ if (typeof document !== "undefined") {
         outline-offset: 1px;
       }
 
-      /* File card grid — 2 columns mobile, 3 tablet, 4 desktop */
+      /* File card grid — fills the available width, ~210px min per card, so
+         wide screens get more columns instead of empty space. Fixed 2 columns
+         on mobile. */
       .file-card-grid {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
         gap: 14px;
-      }
-      @media (max-width: 1024px) {
-        .file-card-grid { grid-template-columns: repeat(3, 1fr); }
       }
       @media (max-width: ${MOBILE_BP}px) {
         .file-card-grid { grid-template-columns: repeat(2, 1fr); }
@@ -421,10 +420,13 @@ function SectionHeader({
 }
 
 // ── file preview helpers ──────────────────────────────────────────────────────
-// Extensions previewed in the in-app image modal; everything else opens in a
-// new tab. FileItem.ext is already uppercased, so matching is case-insensitive.
+// Extensions previewed in the in-app image modal. FileItem.ext is already
+// uppercased, so matching is case-insensitive.
 const IMAGE_EXTS = new Set(["PNG", "JPG", "JPEG", "GIF", "WEBP", "SVG"]);
 const isImageFile = (f: FileItem) => IMAGE_EXTS.has(f.ext);
+// Non-image types the browser renders inline in a new tab. Anything else would
+// just download (octet-stream) and strand an empty tab, so we download it.
+const INLINE_DOC_EXTS = new Set(["PDF", "TXT"]);
 
 // ── skeleton cards for files loading state ────────────────────────────────────
 function FileSkeleton() {
@@ -523,41 +525,68 @@ export default function ProjectDashboard() {
     url: string;
   } | null>(null);
   const objectUrlsRef = useRef<string[]>([]);
+  // In-flight thumbnail fetches, keyed by doc id, so the prefetch effect and a
+  // preview click share one request instead of racing to fetch duplicate blobs.
+  const thumbFetches = useRef<Record<string, Promise<string>>>({});
+  const mountedRef = useRef(true);
+  useEffect(() => () => void (mountedRef.current = false), []);
 
-  // Revoke all created object URLs when leaving the page.
+  // Revoke object URLs and drop cached thumbs when switching projects or
+  // leaving the page, so blobs don't accumulate across navigation.
   useEffect(
     () => () => {
       objectUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
+      objectUrlsRef.current = [];
+      setThumbs({});
     },
-    [],
+    [project?.id],
   );
 
-  // Fetch thumbnails for image files whenever the file list changes.
+  // Fetch (once) the resized thumbnail for an image doc, caching the object URL
+  // by doc id and de-duplicating concurrent requests. Callers own display only;
+  // revocation is handled centrally by the effects above/below.
+  const ensureThumb = (f: FileItem): Promise<string> => {
+    const cached = thumbs[f.id];
+    if (cached) return Promise.resolve(cached);
+    const inflight = thumbFetches.current[f.id];
+    if (inflight) return inflight;
+    const p = getFileUrl(project!.id, f.id, f.ext, "resized").then((url) => {
+      if (!mountedRef.current) {
+        URL.revokeObjectURL(url);
+        return url;
+      }
+      objectUrlsRef.current.push(url);
+      setThumbs((t) => ({ ...t, [f.id]: url }));
+      return url;
+    });
+    thumbFetches.current[f.id] = p;
+    p.catch(() => {}).finally(() => {
+      delete thumbFetches.current[f.id];
+    });
+    return p;
+  };
+
+  // Prefetch thumbnails and revoke ones whose doc is gone (e.g. deleted).
   const imageIds = (project?.files ?? [])
     .filter(isImageFile)
     .map((f) => f.id)
     .join(",");
   useEffect(() => {
     if (!project) return;
-    let cancelled = false;
+    const present = new Set(project.files.filter(isImageFile).map((f) => f.id));
+    setThumbs((t) => {
+      const stale = Object.keys(t).filter((id) => !present.has(id));
+      if (!stale.length) return t;
+      const next = { ...t };
+      for (const id of stale) {
+        URL.revokeObjectURL(next[id]);
+        delete next[id];
+      }
+      return next;
+    });
     for (const f of project.files) {
-      if (!isImageFile(f) || thumbs[f.id]) continue;
-      getFileUrl(project.id, f.id, f.ext, "resized")
-        .then((url) => {
-          if (cancelled) {
-            URL.revokeObjectURL(url);
-            return;
-          }
-          objectUrlsRef.current.push(url);
-          setThumbs((t) => ({ ...t, [f.id]: url }));
-        })
-        .catch(() => {
-          /* Card falls back to the extension badge. */
-        });
+      if (isImageFile(f)) ensureThumb(f).catch(() => {});
     }
-    return () => {
-      cancelled = true;
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imageIds]);
 
@@ -654,22 +683,21 @@ export default function ProjectDashboard() {
 
   const onPreview = (f: FileItem) => {
     if (isImageFile(f)) {
-      const cached = thumbs[f.id];
-      if (cached) {
-        setImagePreview({ name: f.name, url: cached });
-        return;
-      }
       runOrAlert(async () => {
-        const url = await getFileUrl(project.id, f.id, f.ext, "resized");
-        objectUrlsRef.current.push(url);
-        setThumbs((t) => ({ ...t, [f.id]: url }));
+        const url = await ensureThumb(f);
         setImagePreview({ name: f.name, url });
       }, "Failed to preview");
       return;
     }
-    // Non-image documents open in a new tab via the browser's built-in
-    // viewer. Open the tab synchronously so popup blockers allow it, then
-    // point it at the blob once fetched.
+    // Types the browser can't render inline would just download and leave an
+    // empty tab behind — download them directly instead.
+    if (!INLINE_DOC_EXTS.has(f.ext)) {
+      onDownload(f);
+      return;
+    }
+    // Viewable documents open in a new tab via the browser's built-in viewer.
+    // Open the tab synchronously so popup blockers allow it, then point it at
+    // the blob once fetched.
     const win = window.open("about:blank", "_blank");
     runOrAlert(async () => {
       try {
@@ -983,7 +1011,7 @@ export default function ProjectDashboard() {
             <main
               className="tab-content main-pad"
               style={{
-                maxWidth: 980,
+                maxWidth: 1600,
                 width: "100%",
               }}
             >
@@ -1001,9 +1029,10 @@ export default function ProjectDashboard() {
                     <button
                       type="button"
                       className="primary-btn"
+                      style={{ fontSize: 14, padding: "9px 18px" }}
                       onClick={() => fileInputRef.current?.click()}
                     >
-                      <span style={{ fontSize: 15, marginTop: -1 }}>↑</span>
+                      <span style={{ fontSize: 16, marginTop: -1 }}>↑</span>
                       Upload
                     </button>
                   </>
