@@ -75,6 +75,19 @@ function fileMeta(filename: string): { ext: string; color: string } {
   return { ext, color: EXT_COLORS[ext] ?? "#8b8a83" };
 }
 
+// MIME types the browser can render inline. The backend streams every
+// document as application/octet-stream, so previews must re-type the blob.
+const PREVIEW_MIME: Record<string, string> = {
+  PDF: "application/pdf",
+  TXT: "text/plain",
+  PNG: "image/png",
+  JPG: "image/jpeg",
+  JPEG: "image/jpeg",
+  GIF: "image/gif",
+  WEBP: "image/webp",
+  SVG: "image/svg+xml",
+};
+
 function formatBytes(bytes: number): string {
   if (!bytes) return "0 KB";
   const units = ["B", "KB", "MB", "GB"];
@@ -143,6 +156,12 @@ type Store = {
     docId: string,
     name: string,
   ) => Promise<void>;
+  getFileUrl: (
+    projectId: string,
+    docId: string,
+    ext: string,
+    variant?: "resized",
+  ) => Promise<string>;
   saveSettings: (
     projectId: string,
     patch: { name: string; desc: string; finished: boolean },
@@ -292,6 +311,26 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     URL.revokeObjectURL(url);
   };
 
+  // Returns an object URL for a document, typed by extension so the browser
+  // can preview it inline (in an <img> or a new tab). The "resized" variant
+  // asks for the lambda-resized image; the server falls back to the original
+  // when no resized copy exists. Callers own the URL and are responsible for
+  // revoking it.
+  const getFileUrl = async (
+    projectId: string,
+    docId: string,
+    ext: string,
+    variant?: "resized",
+  ): Promise<string> => {
+    const blob = await api.blob(
+      `/project/${projectId}/documents/${docId}${variant ? `?variant=${variant}` : ""}`,
+    );
+    const mime = PREVIEW_MIME[ext.toUpperCase()];
+    return URL.createObjectURL(
+      mime ? new Blob([blob], { type: mime }) : blob,
+    );
+  };
+
   const saveSettings = async (
     projectId: string,
     patch: { name: string; desc: string; finished: boolean },
@@ -346,6 +385,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         renameFile,
         uploadFile,
         downloadFile,
+        getFileUrl,
         saveSettings,
         inviteByEmail,
         generateJoinCode,

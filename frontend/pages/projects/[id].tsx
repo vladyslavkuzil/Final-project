@@ -6,6 +6,7 @@ import {
   ConfirmDeleteProjectModal,
   ConfirmLeaveProjectModal,
   ConfirmRemoveMemberModal,
+  ImagePreviewModal,
   InviteModal,
   SettingsModal,
 } from "../../components/infoboard/modals";
@@ -38,7 +39,7 @@ if (typeof document !== "undefined") {
 
       @media (prefers-reduced-motion: reduce) {
         .tab-content, .sidebar-in, .skeleton,
-        .file-row, .member-row {
+        .member-row {
           animation: none !important;
         }
       }
@@ -82,9 +83,36 @@ if (typeof document !== "undefined") {
         outline-offset: 1px;
       }
 
-      /* File row */
-      .file-row { transition: background 100ms ease; }
-      .file-row:hover { background: ${notion.hoverWash} !important; }
+      /* File card grid — 2 columns mobile, 3 tablet, 4 desktop */
+      .file-card-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+      }
+      @media (max-width: 1024px) {
+        .file-card-grid { grid-template-columns: repeat(3, 1fr); }
+      }
+      @media (max-width: ${MOBILE_BP}px) {
+        .file-card-grid { grid-template-columns: repeat(2, 1fr); }
+      }
+
+      .file-card {
+        background: ${notion.bgPage};
+        border: 1px solid ${notion.border};
+        border-radius: 8px;
+        overflow: hidden;
+        cursor: pointer;
+        transition: box-shadow 150ms ease, transform 150ms ease, border-color 150ms ease;
+      }
+      .file-card:hover {
+        border-color: ${notion.borderStrong};
+        box-shadow: 0 4px 14px rgba(15,15,15,0.1);
+        transform: translateY(-1px) scale(1.015);
+      }
+      .file-card:focus-visible {
+        outline: 2px solid ${notion.accentBlue};
+        outline-offset: 1px;
+      }
 
       /* Member row */
       .member-row { transition: background 100ms ease; }
@@ -159,14 +187,6 @@ if (typeof document !== "undefined") {
         padding: 20px 16px calc(80px + env(safe-area-inset-bottom));
       }
 
-      /* ── Responsive file rows: grid on desktop, stacked card on mobile ── */
-      .file-header-row,
-      .file-row {
-        display: grid;
-        grid-template-columns: 1fr 90px 180px 110px 96px;
-      }
-      .file-meta-mobile { display: none; }
-
       .member-row {
         display: flex;
         align-items: center;
@@ -185,22 +205,6 @@ if (typeof document !== "undefined") {
 
         .main-pad {
           padding: 16px 14px calc(72px + env(safe-area-inset-bottom));
-        }
-
-        .file-header-row { display: none; }
-        .file-row {
-          grid-template-columns: 1fr auto;
-          row-gap: 4px;
-          padding-top: 12px;
-          padding-bottom: 12px;
-        }
-        .file-cell-size, .file-cell-by, .file-cell-date { display: none; }
-        .file-meta-mobile {
-          display: block;
-          grid-column: 1 / -1;
-          font-size: 12px;
-          color: ${notion.textFaint};
-          margin-top: 2px;
         }
 
         .member-row .member-status-label { display: none; }
@@ -415,42 +419,42 @@ function SectionHeader({
   );
 }
 
-// ── skeleton rows for files loading state ─────────────────────────────────────
+// ── file preview helpers ──────────────────────────────────────────────────────
+// Extensions previewed in the in-app image modal; everything else opens in a
+// new tab. FileItem.ext is already uppercased, so matching is case-insensitive.
+const IMAGE_EXTS = new Set(["PNG", "JPG", "JPEG", "GIF", "WEBP", "SVG"]);
+const isImageFile = (f: FileItem) => IMAGE_EXTS.has(f.ext);
+
+// ── skeleton cards for files loading state ────────────────────────────────────
 function FileSkeleton() {
   return (
-    <div style={{ display: "flex", flexDirection: "column" }}>
+    <div className="file-card-grid">
       {Array.from({ length: 4 }).map((_, i) => (
         <div
           key={i}
-          className="file-row"
           style={{
-            gap: 12,
-            padding: "12px 18px",
-            borderBottom: `1px solid ${notion.border}`,
-            alignItems: "center",
+            background: notion.bgPage,
+            border: `1px solid ${notion.border}`,
+            borderRadius: 8,
+            overflow: "hidden",
             opacity: 0,
-            animation: `fadeSlideIn 0.3s ease ${i * 0.06}s forwards`,
+            animation: `fadeIn 0.3s ease ${i * 0.06}s forwards`,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div
-              className="skeleton"
-              style={{ width: 34, height: 26, borderRadius: 4 }}
-            />
-            <div className="skeleton" style={{ width: "60%", height: 13 }} />
-          </div>
-          <div className="skeleton file-cell-size" style={{ width: 50, height: 13 }} />
-          <div className="skeleton file-cell-by" style={{ width: "70%", height: 13 }} />
-          <div className="skeleton file-cell-date" style={{ width: 70, height: 13 }} />
-          <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
-            <div
-              className="skeleton"
-              style={{ width: 26, height: 26, borderRadius: 4 }}
-            />
-            <div
-              className="skeleton"
-              style={{ width: 26, height: 26, borderRadius: 4 }}
-            />
+          <div
+            className="skeleton"
+            style={{ width: "100%", aspectRatio: "4 / 3", borderRadius: 0 }}
+          />
+          <div
+            style={{
+              padding: "10px 12px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
+            <div className="skeleton" style={{ width: "70%", height: 13 }} />
+            <div className="skeleton" style={{ width: "40%", height: 11 }} />
           </div>
         </div>
       ))}
@@ -473,6 +477,7 @@ export default function ProjectDashboard() {
     renameFile,
     uploadFile,
     downloadFile,
+    getFileUrl,
     saveSettings,
     inviteByEmail,
     generateJoinCode,
@@ -509,6 +514,51 @@ export default function ProjectDashboard() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Blob object URLs for image cards (docId -> URL). The API needs an auth
+  // header, so images can't be referenced by plain URL in <img src>.
+  const [thumbs, setThumbs] = useState<Record<string, string>>({});
+  const [imagePreview, setImagePreview] = useState<{
+    name: string;
+    url: string;
+  } | null>(null);
+  const objectUrlsRef = useRef<string[]>([]);
+
+  // Revoke all created object URLs when leaving the page.
+  useEffect(
+    () => () => {
+      objectUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
+    },
+    [],
+  );
+
+  // Fetch thumbnails for image files whenever the file list changes.
+  const imageIds = (project?.files ?? [])
+    .filter(isImageFile)
+    .map((f) => f.id)
+    .join(",");
+  useEffect(() => {
+    if (!project) return;
+    let cancelled = false;
+    for (const f of project.files) {
+      if (!isImageFile(f) || thumbs[f.id]) continue;
+      getFileUrl(project.id, f.id, f.ext, "resized")
+        .then((url) => {
+          if (cancelled) {
+            URL.revokeObjectURL(url);
+            return;
+          }
+          objectUrlsRef.current.push(url);
+          setThumbs((t) => ({ ...t, [f.id]: url }));
+        })
+        .catch(() => {
+          /* Card falls back to the extension badge. */
+        });
+    }
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imageIds]);
 
   const fetchMembers = (projectId: string) =>
     api
@@ -600,6 +650,38 @@ export default function ProjectDashboard() {
       () => downloadFile(project.id, f.id, f.name),
       "Failed to download",
     );
+
+  const onPreview = (f: FileItem) => {
+    if (isImageFile(f)) {
+      const cached = thumbs[f.id];
+      if (cached) {
+        setImagePreview({ name: f.name, url: cached });
+        return;
+      }
+      runOrAlert(async () => {
+        const url = await getFileUrl(project.id, f.id, f.ext, "resized");
+        objectUrlsRef.current.push(url);
+        setThumbs((t) => ({ ...t, [f.id]: url }));
+        setImagePreview({ name: f.name, url });
+      }, "Failed to preview");
+      return;
+    }
+    // Non-image documents open in a new tab via the browser's built-in
+    // viewer. Open the tab synchronously so popup blockers allow it, then
+    // point it at the blob once fetched.
+    const win = window.open("about:blank", "_blank");
+    runOrAlert(async () => {
+      try {
+        const url = await getFileUrl(project.id, f.id, f.ext);
+        objectUrlsRef.current.push(url);
+        if (win) win.location.replace(url);
+        else window.open(url, "_blank");
+      } catch (e) {
+        win?.close();
+        throw e;
+      }
+    }, "Failed to preview");
+  };
 
   const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -927,120 +1009,105 @@ export default function ProjectDashboard() {
                 }
               />
 
-              <div
-                style={{
-                  background: notion.bgPage,
-                  border: `1px solid ${notion.border}`,
-                  borderRadius: 6,
-                  overflow: "hidden",
-                }}
-              >
-                {/* Table header (hidden on mobile) */}
-                <div
-                  className="file-header-row"
-                  style={{
-                    gap: 12,
-                    padding: "9px 18px",
-                    borderBottom: `1px solid ${notion.border}`,
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: notion.textFaint,
-                    textTransform: "uppercase",
-                    letterSpacing: ".5px",
-                    background: notion.bgSubtle,
-                  }}
-                >
-                  <span>Name</span>
-                  <span>Size</span>
-                  <span>Uploaded by</span>
-                  <span>Date</span>
-                  <span style={{ textAlign: "right" }}>Actions</span>
-                </div>
-
-                {filesLoading ? (
-                  <FileSkeleton />
-                ) : project.files.length > 0 ? (
-                  project.files.map((f, i) => (
+              {filesLoading ? (
+                <FileSkeleton />
+              ) : project.files.length > 0 ? (
+                <div className="file-card-grid">
+                  {project.files.map((f, i) => (
                     <div
-                      key={f.name + i}
-                      className="file-row"
+                      key={f.id}
+                      role="button"
+                      tabIndex={0}
+                      className="file-card"
+                      aria-label={`Preview ${f.name}`}
+                      title={`${f.name} · ${f.size} · ${f.by} · ${f.date}`}
+                      onClick={() => onPreview(f)}
+                      onKeyDown={(e) => {
+                        if (
+                          (e.key === "Enter" || e.key === " ") &&
+                          e.target === e.currentTarget
+                        ) {
+                          e.preventDefault();
+                          onPreview(f);
+                        }
+                      }}
                       style={{
-                        gap: 12,
-                        padding: "10px 18px",
-                        borderBottom: `1px solid ${notion.border}`,
-                        alignItems: "center",
-                        fontSize: 13,
                         opacity: 0,
-                        animation: `fadeSlideIn 0.3s ease ${i * 0.04}s forwards`,
+                        animation: `fadeIn 0.3s ease ${i * 0.04}s forwards`,
                       }}
                     >
-                      {/* Name + ext badge (+ mobile meta line) */}
+                      {/* Thumbnail (images) or extension badge placeholder */}
                       <div
                         style={{
+                          aspectRatio: "4 / 3",
+                          background: notion.bgSubtle,
+                          borderBottom: `1px solid ${notion.border}`,
                           display: "flex",
                           alignItems: "center",
-                          gap: 10,
-                          minWidth: 0,
-                          flexWrap: "wrap",
+                          justifyContent: "center",
+                          overflow: "hidden",
                         }}
                       >
-                        <span
+                        {thumbs[f.id] ? (
+                          <img
+                            src={thumbs[f.id]}
+                            alt=""
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "cover",
+                            }}
+                          />
+                        ) : (
+                          <span
+                            style={{
+                              font: "600 12px ui-monospace,Menlo,monospace",
+                              color: "#fff",
+                              background: f.color,
+                              padding: "8px 12px",
+                              borderRadius: 6,
+                              letterSpacing: ".5px",
+                            }}
+                          >
+                            {f.ext}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Name + size */}
+                      <div style={{ padding: "9px 12px 4px", minWidth: 0 }}>
+                        <div
                           style={{
-                            flexShrink: 0,
-                            width: 34,
-                            textAlign: "center",
-                            font: "600 9.5px ui-monospace,Menlo,monospace",
-                            color: "#fff",
-                            background: f.color,
-                            padding: "4px 0",
-                            borderRadius: 4,
-                            letterSpacing: ".3px",
-                          }}
-                        >
-                          {f.ext}
-                        </span>
-                        <span
-                          style={{
+                            fontSize: 13,
                             fontWeight: 500,
                             color: notion.text,
                             whiteSpace: "nowrap",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
-                            minWidth: 0,
                           }}
                         >
                           {f.name}
-                        </span>
-                        <div className="file-meta-mobile">
-                          {f.size} · {f.by} · {f.date}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 11.5,
+                            color: notion.textFaint,
+                            marginTop: 2,
+                          }}
+                        >
+                          {f.size}
                         </div>
                       </div>
 
-                      <span className="file-cell-size" style={{ color: notion.textMuted }}>
-                        {f.size}
-                      </span>
-                      <span
-                        className="file-cell-by"
-                        style={{
-                          color: notion.textMuted,
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                      >
-                        {f.by}
-                      </span>
-                      <span className="file-cell-date" style={{ color: notion.textMuted }}>
-                        {f.date}
-                      </span>
-
-                      {/* Actions */}
+                      {/* Actions — clicks here must not open the preview */}
                       <div
                         style={{
                           display: "flex",
-                          gap: 4,
+                          gap: 2,
                           justifyContent: "flex-end",
+                          padding: "0 6px 6px",
                         }}
+                        onClick={(e) => e.stopPropagation()}
                       >
                         <button
                           type="button"
@@ -1073,67 +1140,70 @@ export default function ProjectDashboard() {
                         )}
                       </div>
                     </div>
-                  ))
-                ) : (
-                  // Empty state
+                  ))}
+                </div>
+              ) : (
+                // Empty state
+                <div
+                  style={{
+                    background: notion.bgPage,
+                    border: `1px solid ${notion.border}`,
+                    borderRadius: 6,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    padding: "64px 20px",
+                    gap: 14,
+                    opacity: 0,
+                    animation: "fadeSlideIn 0.4s ease 0.1s forwards",
+                  }}
+                >
                   <div
                     style={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: 10,
+                      background: notion.bgSubtle,
+                      border: `1.5px dashed ${notion.borderStrong}`,
                       display: "flex",
-                      flexDirection: "column",
                       alignItems: "center",
-                      padding: "64px 20px",
-                      gap: 14,
-                      opacity: 0,
-                      animation: "fadeSlideIn 0.4s ease 0.1s forwards",
+                      justifyContent: "center",
+                      fontSize: 22,
                     }}
                   >
-                    <div
+                    📄
+                  </div>
+                  <div style={{ textAlign: "center" }}>
+                    <p
                       style={{
-                        width: 56,
-                        height: 56,
-                        borderRadius: 10,
-                        background: notion.bgSubtle,
-                        border: `1.5px dashed ${notion.borderStrong}`,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 22,
+                        margin: "0 0 4px",
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: notion.text,
                       }}
                     >
-                      📄
-                    </div>
-                    <div style={{ textAlign: "center" }}>
-                      <p
-                        style={{
-                          margin: "0 0 4px",
-                          fontSize: 14,
-                          fontWeight: 600,
-                          color: notion.text,
-                        }}
-                      >
-                        No files yet
-                      </p>
-                      <p
-                        style={{
-                          margin: 0,
-                          fontSize: 13,
-                          color: notion.textMuted,
-                        }}
-                      >
-                        Upload the first document to get started.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      className="primary-btn"
-                      onClick={() => fileInputRef.current?.click()}
+                      No files yet
+                    </p>
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 13,
+                        color: notion.textMuted,
+                      }}
                     >
-                      <span style={{ fontSize: 15 }}>↑</span>
-                      Upload a file
-                    </button>
+                      Upload the first document to get started.
+                    </p>
                   </div>
-                )}
-              </div>
+                  <button
+                    type="button"
+                    className="primary-btn"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <span style={{ fontSize: 15 }}>↑</span>
+                    Upload a file
+                  </button>
+                </div>
+              )}
             </main>
           )}
 
@@ -1330,6 +1400,13 @@ export default function ProjectDashboard() {
       </div>
 
       {/* ── Modals ── */}
+      {imagePreview && (
+        <ImagePreviewModal
+          name={imagePreview.name}
+          url={imagePreview.url}
+          onClose={() => setImagePreview(null)}
+        />
+      )}
       {modal === "invite" && (
         <InviteModal
           onClose={() => setModal(null)}
