@@ -1,4 +1,5 @@
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
@@ -29,6 +30,34 @@ def _download_filename(title: str, stored_path: str) -> str:
     if not Path(name).suffix:
         name += Path(stored_path).suffix
     return name
+
+
+def _resized_key(original_key: str) -> str | None:
+    """Map an original S3 key to the image_resize lambda's output key.
+
+    Mirrors the lambda's rules: only original/-prefixed jpg/jpeg/png keys are
+    processed, and jpeg output always lands under a .jpg extension. Returns
+    None for keys the lambda never touches (including local-storage keys).
+    """
+    if not original_key.startswith("original/"):
+        return None
+    ext = Path(original_key).suffix.lower()
+    key = original_key.replace("original/", "resized/", 1)
+    if ext in (".jpg", ".jpeg"):
+        return str(Path(key).with_suffix(".jpg"))
+    if ext == ".png":
+        return key
+    return None
+
+
+def _content_disposition(filename: str) -> str:
+    """Build a Content-Disposition header that survives non-latin-1 filenames.
+
+    HTTP headers must be latin-1, so non-ASCII names go in the RFC 5987
+    filename* parameter with a plain-ASCII fallback in filename.
+    """
+    fallback = filename.encode("ascii", "ignore").decode() or "download"
+    return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{quote(filename)}"
 
 
 @router.get("", response_model=list[DocumentResponse])
@@ -63,6 +92,7 @@ async def upload_document(
 def download_document(
     project_id: str,
     document_id: str,
+    variant: str = "original",
     db: Session = Depends(get_db),
     _: AccessContext = Depends(require_role()),
     storage: StorageBackend = Depends(get_storage),
@@ -73,20 +103,29 @@ def download_document(
             status_code=status.HTTP_404_NOT_FOUND, detail="Document not found"
         )
 
+    # Prefer the lambda-resized copy when asked for, falling back to the
+    # original if it doesn't exist (local storage, unsupported formats, images
+    # the lambda skipped, or resize still in flight).
+    path = doc.file_path
+    if variant == "resized":
+        resized = _resized_key(doc.file_path)
+        if resized and storage.exists(resized):
+            path = resized
+
     # Resolve the stored file up front: the byte stream is produced lazily, so a
     # missing/invalid key would otherwise raise mid-stream, after the 200 status
     # and headers have already been sent. Check now to return a clean 404.
-    if not storage.exists(doc.file_path):
+    if not storage.exists(path):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Document file not found"
         )
 
     return StreamingResponse(
-        storage.get(doc.file_path),
+        storage.get(path),
         media_type="application/octet-stream",
         headers={
-            "Content-Disposition": (
-                f'attachment; filename="{_download_filename(doc.title, doc.file_path)}"'
+            "Content-Disposition": _content_disposition(
+                _download_filename(doc.title, doc.file_path)
             )
         },
     )
