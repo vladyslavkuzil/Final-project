@@ -98,10 +98,11 @@ if (typeof document !== "undefined") {
 
       .file-card {
         background: ${notion.bgPage};
-        border: 1px solid ${notion.border};
+        border: 1px solid ${notion.borderStrong};
         border-radius: 8px;
         overflow: hidden;
         cursor: pointer;
+        box-shadow: 0 1px 3px rgba(15,15,15,0.06);
         transition: box-shadow 150ms ease, transform 150ms ease, border-color 150ms ease;
       }
       .file-card:hover {
@@ -1040,7 +1041,8 @@ export default function ProjectDashboard() {
                       <div
                         style={{
                           aspectRatio: "4 / 3",
-                          background: notion.bgSubtle,
+                          // Light wash of the file-type color (hex + alpha)
+                          background: `${f.color}14`,
                           borderBottom: `1px solid ${notion.border}`,
                           display: "flex",
                           alignItems: "center",
@@ -1093,9 +1095,12 @@ export default function ProjectDashboard() {
                             fontSize: 11.5,
                             color: notion.textFaint,
                             marginTop: 2,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
                           }}
                         >
-                          {f.size}
+                          {f.size} · {f.by.split("@")[0]}
                         </div>
                       </div>
 

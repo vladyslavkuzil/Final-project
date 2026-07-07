@@ -67,6 +67,14 @@ const EXT_COLORS: Record<string, string> = {
   CSV: "#5c5b57",
   FIG: "#a259ff",
   TXT: "#6b6b67",
+  PNG: "#9065b0",
+  JPG: "#e2a03f",
+  JPEG: "#e2a03f",
+  GIF: "#c17ec9",
+  WEBP: "#4f8a5b",
+  SVG: "#d97b2c",
+  BMP: "#9065b0",
+  TIFF: "#9065b0",
 };
 
 function fileMeta(filename: string): { ext: string; color: string } {
