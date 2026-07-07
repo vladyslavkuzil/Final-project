@@ -252,10 +252,13 @@ if (typeof document !== "undefined") {
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function buildWebSocketUrl(projectId: string, token: string): string {
-  const url = new URL("/api", window.location.origin);
+  // Derive from the REST base URL (NEXT_PUBLIC_API_URL) so the socket hits
+  // the same host as the API; resolving against the page origin keeps a
+  // relative base like "/api" working too.
+  const url = new URL(getApiBaseUrl(), window.location.origin);
 
-  url.protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  url.pathname = `/api/ws/projects/${encodeURIComponent(projectId)}`;
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  url.pathname = `${url.pathname.replace(/\/$/, "")}/ws/projects/${encodeURIComponent(projectId)}`;
   url.search = `token=${encodeURIComponent(token)}`;
 
   return url.toString();
