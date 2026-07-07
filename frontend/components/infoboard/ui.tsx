@@ -341,10 +341,22 @@ export function Hov({
         ...(hov ? hoverStyle : null),
         ...(foc ? focusStyle : null),
       }}
-      onMouseEnter={(e: React.MouseEvent) => { setHov(true);  onMouseEnter?.(e); }}
-      onMouseLeave={(e: React.MouseEvent) => { setHov(false); onMouseLeave?.(e); }}
-      onFocus={(e: React.FocusEvent)      => { setFoc(true);  onFocus?.(e);      }}
-      onBlur={(e: React.FocusEvent)       => { setFoc(false); onBlur?.(e);       }}
+      onMouseEnter={(e: React.MouseEvent) => {
+        setHov(true);
+        onMouseEnter?.(e);
+      }}
+      onMouseLeave={(e: React.MouseEvent) => {
+        setHov(false);
+        onMouseLeave?.(e);
+      }}
+      onFocus={(e: React.FocusEvent) => {
+        setFoc(true);
+        onFocus?.(e);
+      }}
+      onBlur={(e: React.FocusEvent) => {
+        setFoc(false);
+        onBlur?.(e);
+      }}
     />
   );
 }
@@ -389,12 +401,7 @@ export function SkeletonBlock({
   height?: number | string;
   style?: React.CSSProperties;
 }) {
-  return (
-    <div
-      className="ib-skeleton"
-      style={{ width, height, ...style }}
-    />
-  );
+  return <div className="ib-skeleton" style={{ width, height, ...style }} />;
 }
 
 // ── ErrorBanner ───────────────────────────────────────────────────────────────
@@ -566,7 +573,9 @@ export function Modal({
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, []);
 
   // Focus trap — keep focus inside the modal
@@ -574,16 +583,22 @@ export function Modal({
     const el = cardRef.current;
     if (!el) return;
     const focusable = el.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
     );
     const first = focusable[0];
-    const last  = focusable[focusable.length - 1];
-    const trap  = (e: KeyboardEvent) => {
+    const last = focusable[focusable.length - 1];
+    const trap = (e: KeyboardEvent) => {
       if (e.key !== "Tab") return;
       if (e.shiftKey) {
-        if (document.activeElement === first) { e.preventDefault(); last?.focus(); }
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last?.focus();
+        }
       } else {
-        if (document.activeElement === last)  { e.preventDefault(); first?.focus(); }
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first?.focus();
+        }
       }
     };
     window.addEventListener("keydown", trap);

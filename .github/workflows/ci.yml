@@ -4,7 +4,7 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
     branches:
-      - main  
+      - main
   push:
     branches:
       - main
@@ -36,7 +36,7 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
-      
+
     defaults:
       run:
         working-directory: ./backend
@@ -48,11 +48,11 @@ jobs:
       APP_ENV: local
       REDIS_HOST: localhost
       REDIS_PORT: 6379
-      
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Install uv
         uses: astral-sh/setup-uv@v5
 
@@ -61,13 +61,13 @@ jobs:
 
       - name: Install dependencies
         run: uv sync
-      
+
       - name: Lint (ruff)
         run: uv run ruff check .
-      
+
       - name: Format check (ruff)
         run: uv run ruff format --check .
-      
+
       - name: Run Alembic migrations
         run: uv run alembic -c alembic.ini upgrade head
 
@@ -88,6 +88,22 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check (prettier)
+        run: npx prettier --check .
 
       - name: Build frontend Docker image
         run: |

@@ -439,9 +439,18 @@ function FileSkeleton() {
             />
             <div className="skeleton" style={{ width: "60%", height: 13 }} />
           </div>
-          <div className="skeleton file-cell-size" style={{ width: 50, height: 13 }} />
-          <div className="skeleton file-cell-by" style={{ width: "70%", height: 13 }} />
-          <div className="skeleton file-cell-date" style={{ width: 70, height: 13 }} />
+          <div
+            className="skeleton file-cell-size"
+            style={{ width: 50, height: 13 }}
+          />
+          <div
+            className="skeleton file-cell-by"
+            style={{ width: "70%", height: 13 }}
+          />
+          <div
+            className="skeleton file-cell-date"
+            style={{ width: 70, height: 13 }}
+          />
           <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
             <div
               className="skeleton"
@@ -786,12 +795,20 @@ export default function ProjectDashboard() {
             </div>
 
             {isAdmin ? (
-              <button type="button" className="danger-btn" onClick={onDeleteProject}>
+              <button
+                type="button"
+                className="danger-btn"
+                onClick={onDeleteProject}
+              >
                 <span style={{ fontSize: 13 }}>🗑</span>
                 Delete project
               </button>
             ) : (
-              <button type="button" className="danger-btn" onClick={onLeaveProject}>
+              <button
+                type="button"
+                className="danger-btn"
+                onClick={onLeaveProject}
+              >
                 <span style={{ fontSize: 13 }}>⏻</span>
                 Leave project
               </button>
@@ -1016,7 +1033,10 @@ export default function ProjectDashboard() {
                         </div>
                       </div>
 
-                      <span className="file-cell-size" style={{ color: notion.textMuted }}>
+                      <span
+                        className="file-cell-size"
+                        style={{ color: notion.textMuted }}
+                      >
                         {f.size}
                       </span>
                       <span
@@ -1030,7 +1050,10 @@ export default function ProjectDashboard() {
                       >
                         {f.by}
                       </span>
-                      <span className="file-cell-date" style={{ color: notion.textMuted }}>
+                      <span
+                        className="file-cell-date"
+                        style={{ color: notion.textMuted }}
+                      >
                         {f.date}
                       </span>
 

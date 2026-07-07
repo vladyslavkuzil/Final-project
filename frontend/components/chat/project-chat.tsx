@@ -261,7 +261,6 @@ function buildWebSocketUrl(projectId: string, token: string): string {
   return url.toString();
 }
 
-
 // Best-effort decode of the JWT payload to recover the current user's id.
 // Falls back gracefully (returns null) for opaque/non-JWT tokens — the app
 // still works correctly without this, via the optimistic-send tracking below.
@@ -271,7 +270,8 @@ function decodeJwtUserId(token: string): string | null {
     if (!payloadB64) return null;
     const json = atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/"));
     const payload = JSON.parse(json) as Record<string, unknown>;
-    const candidate = payload.sub ?? payload.user_id ?? payload.id ?? payload.uid;
+    const candidate =
+      payload.sub ?? payload.user_id ?? payload.id ?? payload.uid;
     return typeof candidate === "string" ? candidate : null;
   } catch {
     return null;
@@ -287,25 +287,37 @@ function formatTime(iso: string): string {
 function formatDateDivider(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  const today     = new Date();
+  const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
-  if (d.toDateString() === today.toDateString())     return "Today";
+  if (d.toDateString() === today.toDateString()) return "Today";
   if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
-  return d.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+  return d.toLocaleDateString([], {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
 }
 
-const AVATAR_COLORS = ["#e2a03f","#9065b0","#4f8a5b","#d15c5c","#3980c1","#c17ec9"];
+const AVATAR_COLORS = [
+  "#e2a03f",
+  "#9065b0",
+  "#4f8a5b",
+  "#d15c5c",
+  "#3980c1",
+  "#c17ec9",
+];
 function avatarColor(seed: string): string {
   let hash = 0;
-  for (let i = 0; i < seed.length; i++) hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < seed.length; i++)
+    hash = seed.charCodeAt(i) + ((hash << 5) - hash);
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
 function shouldGroup(a: ChatMessage, b: ChatMessage): boolean {
   if (a.sender_id !== b.sender_id) return false;
   const diff = Math.abs(
-    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
   );
   return diff < 3 * 60 * 1000;
 }
@@ -317,9 +329,24 @@ function genTempId(): string {
 // ── sub-components ────────────────────────────────────────────────────────────
 function DateDivider({ label }: { label: string }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0 12px" }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        margin: "16px 0 12px",
+      }}
+    >
       <div style={{ flex: 1, height: 1, background: notion.border }} />
-      <span style={{ fontSize: 11.5, fontWeight: 500, color: notion.textFaint, letterSpacing: ".3px", whiteSpace: "nowrap" }}>
+      <span
+        style={{
+          fontSize: 11.5,
+          fontWeight: 500,
+          color: notion.textFaint,
+          letterSpacing: ".3px",
+          whiteSpace: "nowrap",
+        }}
+      >
         {label}
       </span>
       <div style={{ flex: 1, height: 1, background: notion.border }} />
@@ -363,7 +390,8 @@ function MessageRow({
               marginRight: 2,
             }}
           >
-            You · {message._failed ? "not sent" : formatTime(message.created_at)}
+            You ·{" "}
+            {message._failed ? "not sent" : formatTime(message.created_at)}
           </span>
         )}
 
@@ -444,8 +472,17 @@ function MessageRow({
       {/* Bubble + name */}
       <div style={{ minWidth: 0, maxWidth: "68%" }}>
         {!grouped && (
-          <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 4 }}>
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: notion.text }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "baseline",
+              gap: 6,
+              marginBottom: 4,
+            }}
+          >
+            <span
+              style={{ fontSize: 12.5, fontWeight: 600, color: notion.text }}
+            >
               {message.sender_email.split("@")[0]}
             </span>
             <span style={{ fontSize: 11, color: notion.textFaint }}>
@@ -485,7 +522,7 @@ function StatusPill({
       aria-live="polite"
     >
       <span className={`status-dot ${status}`} />
-      {status === "connected"  && "Connected"}
+      {status === "connected" && "Connected"}
       {status === "connecting" && "Connecting…"}
       {status === "disconnected" && (
         <>
@@ -508,10 +545,10 @@ export function ProjectChatPanel({
   projectName: string;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [newIds,   setNewIds]   = useState<Set<string>>(new Set());
-  const [draft,    setDraft]    = useState("");
-  const [status,   setStatus]   = useState<ConnectionStatus>("connecting");
-  const [error,    setError]    = useState("");
+  const [newIds, setNewIds] = useState<Set<string>>(new Set());
+  const [draft, setDraft] = useState("");
+  const [status, setStatus] = useState<ConnectionStatus>("connecting");
+  const [error, setError] = useState("");
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
 
   // Ids of messages authored by the current user — populated both from the
@@ -520,14 +557,16 @@ export function ProjectChatPanel({
   const [ownIds, setOwnIds] = useState<Set<string>>(new Set());
   const myIdRef = useRef<string | null>(null);
 
-  const socketRef    = useRef<WebSocket | null>(null);
-  const listRef       = useRef<HTMLDivElement>(null);
-  const retryRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const retryCount    = useRef(0);
-  const textareaRef   = useRef<HTMLTextAreaElement>(null);
+  const socketRef = useRef<WebSocket | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryCount = useRef(0);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   // tempId -> timeout handle, so we can mark a pending send as failed if it's
   // never echoed back within PENDING_TIMEOUT_MS.
-  const pendingTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const pendingTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
 
   // ── connection ──────────────────────────────────────────────────────────────
   const connect = useCallback(() => {
@@ -554,8 +593,10 @@ export function ProjectChatPanel({
 
     socket.onmessage = (event) => {
       try {
-        const payload = JSON.parse(event.data) as
-          { type?: string; detail?: string } & Partial<ChatMessage>;
+        const payload = JSON.parse(event.data) as {
+          type?: string;
+          detail?: string;
+        } & Partial<ChatMessage>;
 
         if (
           payload.type === "message" &&
@@ -571,7 +612,10 @@ export function ProjectChatPanel({
             // If this echoes a message we just sent optimistically, replace
             // the pending placeholder instead of appending a duplicate.
             const pendingIdx = prev.findIndex(
-              (m) => m._pending && m.content === msg.content && m.id.startsWith("pending-")
+              (m) =>
+                m._pending &&
+                m.content === msg.content &&
+                m.id.startsWith("pending-"),
             );
             if (pendingIdx !== -1) {
               const tempId = prev[pendingIdx].id;
@@ -623,7 +667,9 @@ export function ProjectChatPanel({
       // being echoed back — surface it as failed immediately rather than
       // waiting out the timeout.
       setMessages((prev) =>
-        prev.map((m) => (m._pending ? { ...m, _pending: false, _failed: true } : m))
+        prev.map((m) =>
+          m._pending ? { ...m, _pending: false, _failed: true } : m,
+        ),
       );
       pendingTimersRef.current.forEach((t) => clearTimeout(t));
       pendingTimersRef.current.clear();
@@ -650,13 +696,17 @@ export function ProjectChatPanel({
               .sort(
                 (a, b) =>
                   new Date(a.created_at).getTime() -
-                  new Date(b.created_at).getTime()
+                  new Date(b.created_at).getTime(),
               )
           : [];
         setMessages(sorted);
         if (myIdRef.current) {
           setOwnIds(
-            new Set(sorted.filter((m) => m.sender_id === myIdRef.current).map((m) => m.id))
+            new Set(
+              sorted
+                .filter((m) => m.sender_id === myIdRef.current)
+                .map((m) => m.id),
+            ),
           );
         }
       })
@@ -716,7 +766,9 @@ export function ProjectChatPanel({
     const socket = socketRef.current;
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       setMessages((prev) =>
-        prev.map((m) => (m.id === tempId ? { ...m, _pending: false, _failed: true } : m))
+        prev.map((m) =>
+          m.id === tempId ? { ...m, _pending: false, _failed: true } : m,
+        ),
       );
       setError("Chat is not connected yet.");
       return;
@@ -726,7 +778,11 @@ export function ProjectChatPanel({
 
     const timer = setTimeout(() => {
       setMessages((prev) =>
-        prev.map((m) => (m.id === tempId && m._pending ? { ...m, _pending: false, _failed: true } : m))
+        prev.map((m) =>
+          m.id === tempId && m._pending
+            ? { ...m, _pending: false, _failed: true }
+            : m,
+        ),
       );
       pendingTimersRef.current.delete(tempId);
     }, PENDING_TIMEOUT_MS);
@@ -738,7 +794,9 @@ export function ProjectChatPanel({
     if (!text) return;
 
     if (text.length > MAX_MESSAGE_LENGTH) {
-      setError(`Message is too long (max ${MAX_MESSAGE_LENGTH.toLocaleString()} characters).`);
+      setError(
+        `Message is too long (max ${MAX_MESSAGE_LENGTH.toLocaleString()} characters).`,
+      );
       return;
     }
 
@@ -768,7 +826,9 @@ export function ProjectChatPanel({
     if (!failed) return;
 
     setMessages((prev) =>
-      prev.map((m) => (m.id === tempId ? { ...m, _pending: true, _failed: false } : m))
+      prev.map((m) =>
+        m.id === tempId ? { ...m, _pending: true, _failed: false } : m,
+      ),
     );
     setError("");
     dispatchSend(tempId, failed.content);
@@ -814,7 +874,9 @@ export function ProjectChatPanel({
           >
             Chat
           </h1>
-          <p style={{ margin: "2px 0 0", fontSize: 13, color: notion.textMuted }}>
+          <p
+            style={{ margin: "2px 0 0", fontSize: 13, color: notion.textMuted }}
+          >
             {projectName}
           </p>
         </div>
@@ -879,8 +941,8 @@ export function ProjectChatPanel({
               {messages.map((msg, i) => {
                 const prev = messages[i - 1];
                 const grouped = !!prev && shouldGroup(prev, msg);
-                const isNew   = newIds.has(msg.id);
-                const isMine  = ownIds.has(msg.id);
+                const isNew = newIds.has(msg.id);
+                const isMine = ownIds.has(msg.id);
 
                 const showDivider =
                   !prev ||
@@ -913,7 +975,16 @@ export function ProjectChatPanel({
             onClick={jumpToLatest}
             aria-label="Jump to latest messages"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <polyline points="6 9 12 15 18 9" />
             </svg>
           </button>
@@ -942,7 +1013,8 @@ export function ProjectChatPanel({
           transition: "border-color 150ms ease, box-shadow 150ms ease",
         }}
         onFocusCapture={(e) => {
-          (e.currentTarget as HTMLDivElement).style.borderColor = notion.accentBlue;
+          (e.currentTarget as HTMLDivElement).style.borderColor =
+            notion.accentBlue;
           (e.currentTarget as HTMLDivElement).style.boxShadow =
             "0 0 0 3px rgba(35,131,226,0.1)";
         }}
@@ -980,7 +1052,8 @@ export function ProjectChatPanel({
           aria-label="Send message"
         >
           <svg
-            width="14" height="14"
+            width="14"
+            height="14"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
