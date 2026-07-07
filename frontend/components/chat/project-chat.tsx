@@ -253,8 +253,7 @@ if (typeof document !== "undefined") {
 // ── helpers ───────────────────────────────────────────────────────────────────
 function buildWebSocketUrl(projectId: string, token: string): string {
   const apiBase =
-    process.env.NEXT_PUBLIC_API_URL ??
-    `${window.location.origin}/api`;
+    process.env.NEXT_PUBLIC_API_URL ?? `${window.location.origin}/api`;
 
   const url = new URL(apiBase);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
