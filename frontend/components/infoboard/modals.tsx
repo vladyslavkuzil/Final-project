@@ -708,7 +708,7 @@ export function ConfirmDeleteProjectModal({
             color: notion.text,
           }}
         >
-          Delete "{projectName}"?
+          Delete &ldquo;{projectName}&rdquo;?
         </h2>
         <p style={{ margin: 0, fontSize: 13, color: notion.textMuted }}>
           This cannot be undone. All files and data will be permanently removed.
@@ -774,7 +774,7 @@ export function ConfirmLeaveProjectModal({
             color: notion.text,
           }}
         >
-          Leave "{projectName}"?
+          Leave &ldquo;{projectName}&rdquo;?
         </h2>
         <p style={{ margin: 0, fontSize: 13, color: notion.textMuted }}>
           You will lose access to its files and messages.

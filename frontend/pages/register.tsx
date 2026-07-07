@@ -190,7 +190,7 @@ function Field({
               letterSpacing: 0,
             }}
           >
-            — passwords don't match
+            {"— passwords don't match"}
           </span>
         )}
       </label>

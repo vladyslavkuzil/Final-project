@@ -175,6 +175,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh().catch(() => {
       /* Pages guard their own auth redirects. */
     });

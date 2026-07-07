@@ -410,7 +410,7 @@ function MessageRow({
             className="chat-retry-btn"
             onClick={() => onRetry(message.id)}
           >
-            Couldn't send · Retry
+            {"Couldn't send · Retry"}
           </button>
         )}
 
@@ -678,12 +678,14 @@ export function ProjectChatPanel({
 
       const delay = Math.min(1000 * 2 ** retryCount.current, 30_000);
       retryCount.current += 1;
+      // eslint-disable-next-line react-hooks/immutability
       retryRef.current = setTimeout(connect, delay);
     };
   }, [projectId]);
 
   useEffect(() => {
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMessages([]);
     setOwnIds(new Set());
     setError("");

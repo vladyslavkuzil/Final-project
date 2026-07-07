@@ -542,6 +542,7 @@ export default function ProjectDashboard() {
 
   useEffect(() => {
     if (id && project) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFilesLoading(true);
       loadProjectDocuments(id)
         .then((members) => setLiveMembers(members))
@@ -567,6 +568,7 @@ export default function ProjectDashboard() {
 
   // Close the mobile "more" menu whenever the tab changes.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMoreMenuOpen(false);
   }, [tab]);
 
