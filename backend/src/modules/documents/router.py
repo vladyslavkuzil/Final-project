@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from src.core.database import get_db
 from src.core.dependencies import AccessContext, require_role
+from src.core.image_keys import resized_key
 from src.core.enums import MembershipRole
 from src.core.storage import StorageBackend, get_storage
 from src.modules.documents import services
@@ -30,24 +31,6 @@ def _download_filename(title: str, stored_path: str) -> str:
     if not Path(name).suffix:
         name += Path(stored_path).suffix
     return name
-
-
-def _resized_key(original_key: str) -> str | None:
-    """Map an original S3 key to the image_resize lambda's output key.
-
-    Mirrors the lambda's rules: only original/-prefixed jpg/jpeg/png keys are
-    processed, and jpeg output always lands under a .jpg extension. Returns
-    None for keys the lambda never touches (including local-storage keys).
-    """
-    if not original_key.startswith("original/"):
-        return None
-    ext = Path(original_key).suffix.lower()
-    key = original_key.replace("original/", "resized/", 1)
-    if ext in (".jpg", ".jpeg"):
-        return str(Path(key).with_suffix(".jpg"))
-    if ext == ".png":
-        return key
-    return None
 
 
 def _content_disposition(filename: str) -> str:
@@ -108,7 +91,7 @@ def download_document(
     # the lambda skipped, or resize still in flight).
     path = doc.file_path
     if variant == "resized":
-        resized = _resized_key(doc.file_path)
+        resized = resized_key(doc.file_path)
         if resized and storage.exists(resized):
             path = resized
 
