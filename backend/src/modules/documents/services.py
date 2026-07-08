@@ -121,6 +121,7 @@ def update_document(
 def delete_document(
     db: Session, storage: StorageBackend, document_id: str, project_id: str
 ) -> bool:
+    # project_id scope prevents cross-project deletions.
     doc = get_document(db, document_id, project_id)
     if not doc:
         return False
