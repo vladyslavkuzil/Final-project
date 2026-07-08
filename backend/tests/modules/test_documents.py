@@ -966,6 +966,7 @@ def test_delete_document_deletes_both_keys_at_unit_level():
 
     db = Mock()
     db.query.return_value.filter.return_value.one_or_none.return_value = None
+    db.query.return_value.filter.return_value.all.return_value = []
     storage = Mock()
     storage.exists.return_value = True  # resized copy exists
     doc = Mock()
@@ -989,6 +990,7 @@ def test_delete_document_skips_resized_delete_when_storage_lacks_it():
 
     db = Mock()
     db.query.return_value.filter.return_value.one_or_none.return_value = None
+    db.query.return_value.filter.return_value.all.return_value = []
     storage = Mock()
     storage.exists.return_value = False  # no resized copy in storage
     doc = Mock()
