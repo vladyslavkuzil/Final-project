@@ -36,56 +36,45 @@ def lambda_handler(event, context):
         obj = s3.get_object(Bucket=bucket, Key=key)
 
         image = Image.open(obj["Body"])
-
+        
         width, height = image.size
 
+        is_png = extension == ".png"
+        resized_key = (
+            key.replace("original/", "resized/", 1)
+            if is_png
+            else os.path.splitext(key.replace("original/", "resized/", 1))[0] + ".jpg"
+        )
+        content_type = "image/png" if is_png else "image/jpeg"
+
         if width <= TARGET_WIDTH:
-            logger.info("Image already small enough: %s", key)
-            continue
-
-        new_height = int(height * TARGET_WIDTH / width)
-
-        resized = image.resize((TARGET_WIDTH, new_height))
+            # Too small to resize — still needs to exist under the resized/
+            # key, unchanged, so downstream lookups (preview, download,
+            # deletion) don't have to special-case "never resized".
+            logger.info("Image already small enough, copying as-is: %s", key)
+            output = image
+        else:
+            new_height = int(height * TARGET_WIDTH / width)
+            output = image.resize((TARGET_WIDTH, new_height))
 
         buffer = io.BytesIO()
-
-        if extension == ".png":
-            resized.save(buffer, format="PNG")
-            content_type = "image/png"
-            resized_key = key.replace("original/", "resized/", 1)
+        if is_png:
+            output.save(buffer, format="PNG")
         else:
-            if image.mode in ("RGBA", "LA"):
-                background = Image.new("RGB", image.size, (255, 255, 255))
-                background.paste(image, mask=image.getchannel("A"))
-                resized = background.resize((TARGET_WIDTH, new_height))
-            else:
-                resized = resized.convert("RGB")
-
-            resized.save(
-                buffer,
-                format="JPEG",
-                quality=85,
-                optimize=True,
-            )
-
-            content_type = "image/jpeg"
-
-            resized_key = (
-                os.path.splitext(key.replace("original/", "resized/", 1))[0]
-                + ".jpg"
-            )
+            if output.mode in ("RGBA", "LA"):
+                background = Image.new("RGB", output.size, (255, 255, 255))
+                background.paste(output, mask=output.getchannel("A"))
+                output = background
+            output = output.convert("RGB")
+            output.save(buffer, format="JPEG", quality=85, optimize=True)
 
         buffer.seek(0)
-
         s3.put_object(
             Bucket=bucket,
             Key=resized_key,
             Body=buffer.getvalue(),
             ContentType=content_type,
         )
-
         logger.info("Uploaded resized image to %s", resized_key)
 
-    return {
-        "status": "ok",
-    }
+    return {"status": "ok"}
