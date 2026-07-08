@@ -253,14 +253,14 @@ def test_download_document_non_ascii_title_sets_utf8_disposition(
 
 
 def test_resized_key_mirrors_lambda_output_rules():
-    from src.modules.documents.router import _resized_key
+    from src.core.image_keys import resized_key
 
-    assert _resized_key("original/p1/a.png") == "resized/p1/a.png"
-    assert _resized_key("original/p1/a.jpg") == "resized/p1/a.jpg"
-    assert _resized_key("original/p1/a.jpeg") == "resized/p1/a.jpg"
-    assert _resized_key("original/p1/a.gif") is None
+    assert resized_key("original/p1/a.png") == "resized/p1/a.png"
+    assert resized_key("original/p1/a.jpg") == "resized/p1/a.jpg"
+    assert resized_key("original/p1/a.jpeg") == "resized/p1/a.jpg"
+    assert resized_key("original/p1/a.gif") is None
     # Local-storage keys have no original/ prefix and are never resized
-    assert _resized_key("abc123.png") is None
+    assert resized_key("abc123.png") is None
 
 
 def test_download_resized_variant_serves_lambda_copy_when_present(
