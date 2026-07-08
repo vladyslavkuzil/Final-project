@@ -36,7 +36,7 @@ def lambda_handler(event, context):
         obj = s3.get_object(Bucket=bucket, Key=key)
 
         image = Image.open(obj["Body"])
-        
+
         width, height = image.size
 
         is_png = extension == ".png"

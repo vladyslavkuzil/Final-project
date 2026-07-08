@@ -46,16 +46,10 @@ def lambda_handler(event, context):
 
         total_size = calculate_project_size(bucket, project_prefix)
 
-        print(
-            f"Project {project_id}: "
-            f"{total_size} / {MAX_PROJECT_SIZE} bytes"
-        )
+        print(f"Project {project_id}: {total_size} / {MAX_PROJECT_SIZE} bytes")
 
         if total_size > MAX_PROJECT_SIZE:
-            print(
-                f"Storage limit exceeded. "
-                f"Deleting uploaded file: {key}"
-            )
+            print(f"Storage limit exceeded. Deleting uploaded file: {key}")
 
             s3.delete_object(
                 Bucket=bucket,
@@ -74,9 +68,7 @@ def lambda_handler(event, context):
                 "total_size": total_size,
             }
 
-    return {
-        "status": "ok"
-    }
+    return {"status": "ok"}
 
 
 def calculate_project_size(bucket: str, prefix: str) -> int:
