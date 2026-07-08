@@ -8,6 +8,7 @@ import uuid
 from sqlalchemy.orm import Session
 from src.core.storage import StorageBackend
 from src.core.cache import redis_client
+from src.core.image_keys import resized_key
 from src.modules.documents.models import Document
 from src.modules.projects.models import Project
 from src.modules.project_membership.models import ProjectMembership
@@ -137,7 +138,10 @@ def delete_document(
         db.rollback()
         raise
     _invalidate_project_caches(db, project_id)
-    # Remove the stored file only after the row is durably gone, so a commit
-    # failure can't orphan a live document whose bytes have already been deleted.
+    # Remove the stored file(s) only after the row is durably gone, so a
+    # commit failure can't orphan a live document whose bytes have already been deleted.
     storage.delete(file_path)
+    resized = resized_key(file_path)
+    if resized and storage.exists(resized):
+        storage.delete(resized)
     return True
