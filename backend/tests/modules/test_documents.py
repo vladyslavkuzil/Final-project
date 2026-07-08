@@ -236,6 +236,88 @@ def test_download_document_disposition_uses_title_not_stored_path(
     assert stored_path not in disposition
 
 
+def test_download_document_non_ascii_title_sets_utf8_disposition(
+    client: TestClient, db: Session, seeded_project: Project
+):
+    # Arrange — headers are latin-1, so a non-ASCII title used to 500
+    r = _upload(client, seeded_project.id, title="załącznik.png", filename="img.png")
+    doc_id = r.json()["id"]
+
+    # Act
+    response = client.get(f"/api/project/{seeded_project.id}/documents/{doc_id}")
+
+    # Assert — 200 with the name RFC 5987-encoded in filename*
+    assert response.status_code == 200
+    disposition = response.headers["content-disposition"]
+    assert "filename*=UTF-8''za%C5%82%C4%85cznik.png" in disposition
+
+
+def test_resized_key_mirrors_lambda_output_rules():
+    from src.modules.documents.router import _resized_key
+
+    assert _resized_key("original/p1/a.png") == "resized/p1/a.png"
+    assert _resized_key("original/p1/a.jpg") == "resized/p1/a.jpg"
+    assert _resized_key("original/p1/a.jpeg") == "resized/p1/a.jpg"
+    assert _resized_key("original/p1/a.gif") is None
+    # Local-storage keys have no original/ prefix and are never resized
+    assert _resized_key("abc123.png") is None
+
+
+def test_download_resized_variant_serves_lambda_copy_when_present(
+    client: TestClient, db: Session, seeded_project: Project, storage_override
+):
+    # Arrange — an S3-style original key with a lambda-resized .jpg beside it
+    r = _upload(
+        client,
+        seeded_project.id,
+        title="Photo",
+        filename="photo.jpeg",
+        content=b"original-bytes",
+    )
+    doc_id = r.json()["id"]
+    original_key = f"original/{seeded_project.id}/photo.jpeg"
+    storage_override.files[original_key] = storage_override.files.pop(
+        r.json()["file_path"]
+    )
+    storage_override.files[f"resized/{seeded_project.id}/photo.jpg"] = b"resized-bytes"
+    from src.modules.documents.models import Document
+
+    db.query(Document).filter_by(id=doc_id).update({"file_path": original_key})
+    db.flush()
+
+    # Act
+    response = client.get(
+        f"/api/project/{seeded_project.id}/documents/{doc_id}?variant=resized"
+    )
+
+    # Assert
+    assert response.status_code == 200
+    assert response.content == b"resized-bytes"
+
+
+def test_download_resized_variant_falls_back_to_original(
+    client: TestClient, seeded_project: Project
+):
+    # Arrange — local-style key, no resized copy exists
+    r = _upload(
+        client,
+        seeded_project.id,
+        title="Photo",
+        filename="photo.png",
+        content=b"original-bytes",
+    )
+    doc_id = r.json()["id"]
+
+    # Act
+    response = client.get(
+        f"/api/project/{seeded_project.id}/documents/{doc_id}?variant=resized"
+    )
+
+    # Assert — the original streams back instead of a 404
+    assert response.status_code == 200
+    assert response.content == b"original-bytes"
+
+
 def test_download_document_nonexistent_id_returns_404(
     client: TestClient, seeded_project: Project
 ):

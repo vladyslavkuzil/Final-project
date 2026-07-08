@@ -884,6 +884,51 @@ export function JoinProjectModal({
   );
 }
 
+// ── Image Preview Modal ───────────────────────────────────────────────────────
+// Lightbox for image documents. Modal already handles the close button,
+// Escape key and backdrop click.
+export function ImagePreviewModal({
+  name,
+  url,
+  onClose,
+}: {
+  name: string;
+  url: string;
+  onClose: () => void;
+}) {
+  return (
+    <Modal maxWidth={760} onClose={onClose}>
+      <h2
+        style={{
+          margin: "0 0 14px",
+          paddingRight: 32,
+          fontSize: 15,
+          fontWeight: 600,
+          letterSpacing: "-.2px",
+          color: notion.text,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
+        {name}
+      </h2>
+      <img
+        src={url}
+        alt={name}
+        style={{
+          display: "block",
+          width: "100%",
+          maxHeight: "70vh",
+          objectFit: "contain",
+          borderRadius: 6,
+          background: notion.bgSubtle,
+        }}
+      />
+    </Modal>
+  );
+}
+
 // ── Settings Modal ────────────────────────────────────────────────────────────
 export function SettingsModal({
   project,
