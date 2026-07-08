@@ -857,3 +857,147 @@ def test_delete_project_removes_its_documents(
         client.get(f"/api/project/{seeded_project.id}/documents/{doc_id}").status_code
         == 404
     )
+
+
+# ---------------------------------------------------------------------------
+# Tests for resized image objects
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Integration-level: real client + InMemoryStorage, mirroring how
+# test_download_resized_variant_serves_lambda_copy_when_present sets up an
+# S3-style original/resized key pair.
+# ---------------------------------------------------------------------------
+
+
+def test_delete_document_removes_resized_copy_when_present(
+    client: TestClient, db: Session, seeded_project: Project, storage_override
+):
+    # Arrange — simulate an S3-style original key with a lambda-resized
+    # .jpg already sitting beside it (as if image_resize already ran).
+    r = _upload(
+        client,
+        seeded_project.id,
+        title="Photo",
+        filename="photo.jpeg",
+        content=b"orig-bytes",
+    )
+    doc_id = r.json()["id"]
+    original_key = f"original/{seeded_project.id}/photo.jpeg"
+    storage_override.files[original_key] = storage_override.files.pop(
+        r.json()["file_path"]
+    )
+    resized_key_str = f"resized/{seeded_project.id}/photo.jpg"
+    storage_override.files[resized_key_str] = b"resized-bytes"
+    from src.modules.documents.models import Document
+
+    db.query(Document).filter_by(id=doc_id).update({"file_path": original_key})
+    db.flush()
+
+    # Act
+    response = client.delete(f"/api/project/{seeded_project.id}/documents/{doc_id}")
+
+    # Assert — both objects are gone, not just the original
+    assert response.status_code == 204
+    assert original_key not in storage_override.files
+    assert resized_key_str not in storage_override.files
+
+
+def test_delete_document_local_key_only_removes_original(
+    client: TestClient, seeded_project: Project, storage_override
+):
+    # Arrange — a plain local-storage key (no original/ prefix), so
+    # resized_key() returns None and there's nothing else to clean up.
+    r = _upload(
+        client, seeded_project.id, title="Doc", filename="plain.pdf", content=b"data"
+    )
+    doc_id = r.json()["id"]
+    stored_path = r.json()["file_path"]
+
+    # Act
+    response = client.delete(f"/api/project/{seeded_project.id}/documents/{doc_id}")
+
+    # Assert
+    assert response.status_code == 204
+    assert stored_path not in storage_override.files
+
+
+def test_delete_document_tolerates_resized_copy_not_yet_written(
+    client: TestClient, db: Session, seeded_project: Project, storage_override
+):
+    # Arrange — an original/ key exists but the resize lambda hasn't run
+    # yet (upload -> delete happening faster than the async resize), so no
+    # resized/ object exists in storage at all.
+    r = _upload(
+        client,
+        seeded_project.id,
+        title="Photo",
+        filename="photo.png",
+        content=b"orig-bytes",
+    )
+    doc_id = r.json()["id"]
+    original_key = f"original/{seeded_project.id}/photo.png"
+    storage_override.files[original_key] = storage_override.files.pop(
+        r.json()["file_path"]
+    )
+    from src.modules.documents.models import Document
+
+    db.query(Document).filter_by(id=doc_id).update({"file_path": original_key})
+    db.flush()
+
+    # Act
+    response = client.delete(f"/api/project/{seeded_project.id}/documents/{doc_id}")
+
+    # Assert — deletes cleanly, no error from a resized copy that never existed
+    assert response.status_code == 204
+    assert original_key not in storage_override.files
+
+
+# ---------------------------------------------------------------------------
+# Unit-level: same Mock/patch.object style as
+# test_delete_document_unlinks_file_only_after_commit, isolating the new
+# resized-cleanup branch from the DB/commit machinery.
+# ---------------------------------------------------------------------------
+
+
+def test_delete_document_deletes_both_keys_at_unit_level():
+    # Arrange
+    from src.modules.documents import services
+
+    db = Mock()
+    db.query.return_value.filter.return_value.one_or_none.return_value = None
+    storage = Mock()
+    storage.exists.return_value = True  # resized copy exists
+    doc = Mock()
+    doc.file_path = "original/proj-1/photo.jpg"
+    doc.size_bytes = 0
+
+    # Act
+    with patch.object(services, "get_document", return_value=doc):
+        result = services.delete_document(db, storage, "doc-1", "proj-1")
+
+    # Assert
+    assert result is True
+    storage.delete.assert_any_call("original/proj-1/photo.jpg")
+    storage.delete.assert_any_call("resized/proj-1/photo.jpg")
+    assert storage.delete.call_count == 2
+
+
+def test_delete_document_skips_resized_delete_when_storage_lacks_it():
+    # Arrange
+    from src.modules.documents import services
+
+    db = Mock()
+    db.query.return_value.filter.return_value.one_or_none.return_value = None
+    storage = Mock()
+    storage.exists.return_value = False  # no resized copy in storage
+    doc = Mock()
+    doc.file_path = "original/proj-1/photo.jpg"
+    doc.size_bytes = 0
+
+    # Act
+    with patch.object(services, "get_document", return_value=doc):
+        services.delete_document(db, storage, "doc-1", "proj-1")
+
+    # Assert — only the original delete happens
+    storage.delete.assert_called_once_with("original/proj-1/photo.jpg")
