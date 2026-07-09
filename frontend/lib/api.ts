@@ -53,7 +53,10 @@ function extractDetail(data: unknown, fallback: string): string {
   return fallback;
 }
 
-async function request(path: string, options: RequestInit = {}): Promise<Response> {
+async function request(
+  path: string,
+  options: RequestInit = {},
+): Promise<Response> {
   const token = getToken();
   const headers = new Headers(options.headers);
   if (token) headers.set("Authorization", `Bearer ${token}`);
@@ -101,14 +104,15 @@ async function parseJson<T>(res: Response): Promise<T> {
 }
 
 export const api = {
-  get: <T>(path: string): Promise<T> => request(path).then((r) => parseJson<T>(r)),
+  get: <T>(path: string): Promise<T> =>
+    request(path).then((r) => parseJson<T>(r)),
   post: <T>(path: string, body?: unknown): Promise<T> =>
-    request(path, { method: "POST", body: JSON.stringify(body ?? {}) }).then((r) =>
-      parseJson<T>(r)
+    request(path, { method: "POST", body: JSON.stringify(body ?? {}) }).then(
+      (r) => parseJson<T>(r),
     ),
   put: <T>(path: string, body?: unknown): Promise<T> =>
-    request(path, { method: "PUT", body: JSON.stringify(body ?? {}) }).then((r) =>
-      parseJson<T>(r)
+    request(path, { method: "PUT", body: JSON.stringify(body ?? {}) }).then(
+      (r) => parseJson<T>(r),
     ),
   del: (path: string): Promise<Response> => request(path, { method: "DELETE" }),
   postForm: <T>(path: string, form: FormData): Promise<T> =>
@@ -118,7 +122,11 @@ export const api = {
 
 // --- Auth -----------------------------------------------------------------
 
-type TokenResponse = { access_token: string; refresh_token: string; token_type: string };
+type TokenResponse = {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+};
 
 export async function login(email: string, password: string): Promise<void> {
   // The backend login endpoint expects OAuth2 form-encoded credentials.

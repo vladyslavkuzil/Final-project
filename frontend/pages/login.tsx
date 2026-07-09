@@ -169,7 +169,8 @@ function Field({
             borderRadius: 5,
             outline: "none",
             fontFamily: "inherit",
-            transition: "border-color 150ms ease, background 150ms ease, box-shadow 150ms ease",
+            transition:
+              "border-color 150ms ease, background 150ms ease, box-shadow 150ms ease",
             boxShadow: focused
               ? "0 0 0 3px rgba(35,131,226,0.12), 0 1px 3px rgba(0,0,0,0.04)"
               : "0 1px 2px rgba(0,0,0,0.03)",
@@ -212,7 +213,13 @@ function Divider({ label }: { label: string }) {
       }}
     >
       <div style={{ flex: 1, height: 1, background: notion.border }} />
-      <span style={{ fontSize: 11.5, color: notion.textFaint, letterSpacing: ".3px" }}>
+      <span
+        style={{
+          fontSize: 11.5,
+          color: notion.textFaint,
+          letterSpacing: ".3px",
+        }}
+      >
         {label}
       </span>
       <div style={{ flex: 1, height: 1, background: notion.border }} />
@@ -270,7 +277,8 @@ export default function Login() {
           width: "100%",
           maxWidth: 380,
           opacity: 0,
-          animation: "fadeSlideIn 0.5s cubic-bezier(0.16,1,0.3,1) 0.05s forwards",
+          animation:
+            "fadeSlideIn 0.5s cubic-bezier(0.16,1,0.3,1) 0.05s forwards",
         }}
       >
         {/* Logo */}
@@ -293,7 +301,8 @@ export default function Login() {
             border: `1px solid ${notion.border}`,
             borderRadius: 8,
             padding: "32px 32px 28px",
-            boxShadow: "0 1px 2px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.04)",
+            boxShadow:
+              "0 1px 2px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.04)",
             animation: shake ? "shake 0.45s ease" : undefined,
           }}
         >
@@ -316,7 +325,14 @@ export default function Login() {
             >
               Welcome back
             </h1>
-            <p style={{ margin: 0, fontSize: 13.5, color: notion.textMuted, lineHeight: 1.5 }}>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 13.5,
+                color: notion.textMuted,
+                lineHeight: 1.5,
+              }}
+            >
               Log in to your workspace to continue.
             </p>
           </div>
@@ -357,7 +373,14 @@ export default function Login() {
               }}
             >
               <span style={{ fontSize: 14, marginTop: 1 }}>⚠️</span>
-              <p style={{ margin: 0, fontSize: 13, color: "#c0392b", lineHeight: 1.5 }}>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 13,
+                  color: "#c0392b",
+                  lineHeight: 1.5,
+                }}
+              >
                 {error}
               </p>
             </div>
@@ -391,10 +414,14 @@ export default function Login() {
                 transition: "background 150ms ease, transform 100ms ease",
                 letterSpacing: ".1px",
               }}
-              hoverStyle={busy ? {} : {
-                background: "#000",
-                transform: "translateY(-1px)",
-              }}
+              hoverStyle={
+                busy
+                  ? {}
+                  : {
+                      background: "#000",
+                      transform: "translateY(-1px)",
+                    }
+              }
             >
               {busy && <Spinner />}
               {busy ? "Logging in…" : "Log in"}

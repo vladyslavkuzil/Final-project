@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { Hov, Logo } from "../../components/infoboard/ui";
-import { JoinProjectModal, NewProjectModal } from "../../components/infoboard/modals";
+import {
+  JoinProjectModal,
+  NewProjectModal,
+} from "../../components/infoboard/modals";
 import { useStore } from "../../lib/store";
 import { clearAuth, getToken } from "../../lib/api";
 
@@ -103,9 +106,18 @@ function SkeletonCard({ delay }: { delay: string }) {
         animation: `cardIn 0.4s ease ${delay} forwards`,
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
         <div className="skeleton" style={{ width: "55%", height: 14 }} />
-        <div className="skeleton" style={{ width: 48, height: 18, borderRadius: 3 }} />
+        <div
+          className="skeleton"
+          style={{ width: 48, height: 18, borderRadius: 3 }}
+        />
       </div>
       <div className="skeleton" style={{ width: "90%", height: 12 }} />
       <div className="skeleton" style={{ width: "70%", height: 12 }} />
@@ -127,7 +139,15 @@ function SkeletonCard({ delay }: { delay: string }) {
 }
 
 // ── badge ─────────────────────────────────────────────────────────────────────
-function Badge({ label, color, bg }: { label: string; color: string; bg: string }) {
+function Badge({
+  label,
+  color,
+  bg,
+}: {
+  label: string;
+  color: string;
+  bg: string;
+}) {
   return (
     <span
       style={{
@@ -148,7 +168,9 @@ function Badge({ label, color, bg }: { label: string; color: string; bg: string 
 
 // ── dot separator ─────────────────────────────────────────────────────────────
 function Dot() {
-  return <span style={{ color: notion.borderStrong, userSelect: "none" }}>·</span>;
+  return (
+    <span style={{ color: notion.borderStrong, userSelect: "none" }}>·</span>
+  );
 }
 
 // ── project card ──────────────────────────────────────────────────────────────
@@ -204,9 +226,17 @@ function ProjectCard({
             <Badge label="Finished" color="#4f8a5b" bg="rgba(79,138,91,0.12)" />
           )}
           {p.myRole === "Admin" ? (
-            <Badge label="Admin" color={notion.accentBlue} bg="rgba(35,131,226,0.1)" />
+            <Badge
+              label="Admin"
+              color={notion.accentBlue}
+              bg="rgba(35,131,226,0.1)"
+            />
           ) : (
-            <Badge label="Member" color={notion.textMuted} bg={notion.bgSubtle} />
+            <Badge
+              label="Member"
+              color={notion.textMuted}
+              bg={notion.bgSubtle}
+            />
           )}
         </div>
       </div>
@@ -225,7 +255,9 @@ function ProjectCard({
           minHeight: 38,
         }}
       >
-        {p.desc ? p.desc : (
+        {p.desc ? (
+          p.desc
+        ) : (
           <span style={{ color: notion.textFaint, fontStyle: "italic" }}>
             No description
           </span>
@@ -538,7 +570,9 @@ export default function ProjectsHome() {
                 fontFamily: "inherit",
               }}
             >
-              <span style={{ fontSize: 17, lineHeight: 1, marginTop: -1 }}>+</span>
+              <span style={{ fontSize: 17, lineHeight: 1, marginTop: -1 }}>
+                +
+              </span>
               New project
             </button>
           </div>

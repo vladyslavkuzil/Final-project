@@ -202,6 +202,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh().catch(() => {
       /* Pages guard their own auth redirects. */
     });
@@ -334,9 +335,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       `/project/${projectId}/documents/${docId}${variant ? `?variant=${variant}` : ""}`,
     );
     const mime = PREVIEW_MIME[ext.toUpperCase()];
-    return URL.createObjectURL(
-      mime ? new Blob([blob], { type: mime }) : blob,
-    );
+    return URL.createObjectURL(mime ? new Blob([blob], { type: mime }) : blob);
   };
 
   const saveSettings = async (

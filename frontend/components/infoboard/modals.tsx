@@ -404,7 +404,6 @@ export function InviteModal({
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
   const [codeGenerating, setCodeGenerating] = useState(false);
   const [codeError, setCodeError] = useState("");
-  const [copied, setCopied] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { error, busy, submit } = useModalSubmit(
@@ -427,7 +426,6 @@ export function InviteModal({
     setCodeGenerating(true);
     setCodeError("");
     setGeneratedCode(null);
-    setCopied(false);
     try {
       const code = await onGenerateCode();
       setGeneratedCode(code);
@@ -436,14 +434,6 @@ export function InviteModal({
     } finally {
       setCodeGenerating(false);
     }
-  };
-
-  const handleCopy = () => {
-    if (!generatedCode) return;
-    navigator.clipboard.writeText(generatedCode).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
   };
 
   return (
@@ -589,31 +579,14 @@ export function InviteModal({
                 {codeError && <ErrorBanner message={codeError} />}
               </>
             ) : (
-              <div
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  animation: "fadeSlideIn 0.2s ease",
-                }}
-              >
+              <div style={{ animation: "fadeSlideIn 0.2s ease" }}>
                 <input
                   className="modal-input"
                   readOnly
                   value={generatedCode}
-                  style={{ flex: 1, fontFamily: "monospace", fontSize: 13 }}
+                  style={{ fontFamily: "monospace", fontSize: 13 }}
                   onFocus={(e) => e.target.select()}
                 />
-                <button
-                  className="modal-btn-confirm"
-                  onClick={handleCopy}
-                  style={{
-                    flexShrink: 0,
-                    minWidth: 72,
-                    justifyContent: "center",
-                  }}
-                >
-                  {copied ? "✓ Copied" : "Copy"}
-                </button>
               </div>
             )}
           </div>
@@ -735,7 +708,7 @@ export function ConfirmDeleteProjectModal({
             color: notion.text,
           }}
         >
-          Delete "{projectName}"?
+          Delete &ldquo;{projectName}&rdquo;?
         </h2>
         <p style={{ margin: 0, fontSize: 13, color: notion.textMuted }}>
           This cannot be undone. All files and data will be permanently removed.
@@ -801,7 +774,7 @@ export function ConfirmLeaveProjectModal({
             color: notion.text,
           }}
         >
-          Leave "{projectName}"?
+          Leave &ldquo;{projectName}&rdquo;?
         </h2>
         <p style={{ margin: 0, fontSize: 13, color: notion.textMuted }}>
           You will lose access to its files and messages.

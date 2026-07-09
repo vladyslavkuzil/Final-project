@@ -1,2 +1,5 @@
-# Force LF line endings for shell scripts regardless of OS
+# Enforce LF for all text files (keeps CI/Linux and prettier happy)
+* text=auto eol=lf
+
+# Shell scripts must always be LF
 *.sh text eol=lf

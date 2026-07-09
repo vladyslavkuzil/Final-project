@@ -72,24 +72,25 @@ if (typeof document !== "undefined") {
 
 // ── password strength ─────────────────────────────────────────────────────────
 function getPasswordStrength(pw: string): {
-  score: number;       // 0–4
+  score: number; // 0–4
   label: string;
   color: string;
   bg: string;
 } {
-  if (!pw) return { score: 0, label: "", color: "transparent", bg: "transparent" };
+  if (!pw)
+    return { score: 0, label: "", color: "transparent", bg: "transparent" };
   let score = 0;
-  if (pw.length >= 8)              score++;
-  if (/[A-Z]/.test(pw))           score++;
-  if (/[0-9]/.test(pw))           score++;
-  if (/[^A-Za-z0-9]/.test(pw))   score++;
+  if (pw.length >= 8) score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
 
   const levels = [
-    { label: "Too short",  color: "#eb5757", bg: "rgba(235,87,87,0.12)"  },
-    { label: "Weak",       color: "#e2a03f", bg: "rgba(226,160,63,0.12)" },
-    { label: "Fair",       color: "#e2a03f", bg: "rgba(226,160,63,0.12)" },
-    { label: "Good",       color: "#4f8a5b", bg: "rgba(79,138,91,0.12)"  },
-    { label: "Strong",     color: "#4f8a5b", bg: "rgba(79,138,91,0.12)"  },
+    { label: "Too short", color: "#eb5757", bg: "rgba(235,87,87,0.12)" },
+    { label: "Weak", color: "#e2a03f", bg: "rgba(226,160,63,0.12)" },
+    { label: "Fair", color: "#e2a03f", bg: "rgba(226,160,63,0.12)" },
+    { label: "Good", color: "#4f8a5b", bg: "rgba(79,138,91,0.12)" },
+    { label: "Strong", color: "#4f8a5b", bg: "rgba(79,138,91,0.12)" },
   ];
   return { score, ...levels[score] };
 }
@@ -145,8 +146,14 @@ function Field({
 
   const strength = showStrength ? getPasswordStrength(value) : null;
 
-  const isMatch = matchValue !== undefined ? value === matchValue && value.length > 0 : null;
-  const showMatchError = matchValue !== undefined && touched && !focused && value.length > 0 && value !== matchValue;
+  const isMatch =
+    matchValue !== undefined ? value === matchValue && value.length > 0 : null;
+  const showMatchError =
+    matchValue !== undefined &&
+    touched &&
+    !focused &&
+    value.length > 0 &&
+    value !== matchValue;
 
   return (
     <div
@@ -168,15 +175,22 @@ function Field({
           color: showMatchError
             ? "#eb5757"
             : focused
-            ? notion.accentBlue
-            : notion.textMuted,
+              ? notion.accentBlue
+              : notion.textMuted,
           transition: "color 150ms ease",
         }}
       >
         {label}
         {showMatchError && (
-          <span style={{ fontWeight: 400, marginLeft: 6, textTransform: "none", letterSpacing: 0 }}>
-            — passwords don't match
+          <span
+            style={{
+              fontWeight: 400,
+              marginLeft: 6,
+              textTransform: "none",
+              letterSpacing: 0,
+            }}
+          >
+            {"— passwords don't match"}
           </span>
         )}
       </label>
@@ -210,13 +224,14 @@ function Field({
               showMatchError
                 ? "rgba(235,87,87,0.5)"
                 : focused
-                ? notion.accentBlue
-                : notion.border
+                  ? notion.accentBlue
+                  : notion.border
             }`,
             borderRadius: 5,
             outline: "none",
             fontFamily: "inherit",
-            transition: "border-color 150ms ease, background 150ms ease, box-shadow 150ms ease",
+            transition:
+              "border-color 150ms ease, background 150ms ease, box-shadow 150ms ease",
             boxShadow: focused
               ? showMatchError
                 ? "0 0 0 3px rgba(235,87,87,0.1)"
@@ -236,7 +251,12 @@ function Field({
               fontSize: 13,
               opacity: 0,
               animation: "fadeIn 0.2s ease forwards",
-              color: isMatch === false ? "#eb5757" : isMatch === true ? "#4f8a5b" : "#4f8a5b",
+              color:
+                isMatch === false
+                  ? "#eb5757"
+                  : isMatch === true
+                    ? "#4f8a5b"
+                    : "#4f8a5b",
             }}
           >
             {isMatch === false ? "✕" : "✓"}
@@ -270,7 +290,8 @@ function Field({
                 width: `${(strength.score / 4) * 100}%`,
                 background: strength.color,
                 borderRadius: 99,
-                transition: "width 300ms cubic-bezier(0.16,1,0.3,1), background 300ms ease",
+                transition:
+                  "width 300ms cubic-bezier(0.16,1,0.3,1), background 300ms ease",
               }}
             />
           </div>
@@ -304,7 +325,13 @@ function Divider({ label }: { label: string }) {
       }}
     >
       <div style={{ flex: 1, height: 1, background: notion.border }} />
-      <span style={{ fontSize: 11.5, color: notion.textFaint, letterSpacing: ".3px" }}>
+      <span
+        style={{
+          fontSize: 11.5,
+          color: notion.textFaint,
+          letterSpacing: ".3px",
+        }}
+      >
         {label}
       </span>
       <div style={{ flex: 1, height: 1, background: notion.border }} />
@@ -315,12 +342,12 @@ function Divider({ label }: { label: string }) {
 // ── page ──────────────────────────────────────────────────────────────────────
 export default function Register() {
   const router = useRouter();
-  const [email, setEmail]       = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirm, setConfirm]   = useState("");
-  const [error, setError]       = useState("");
-  const [busy, setBusy]         = useState(false);
-  const [shake, setShake]       = useState(false);
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [shake, setShake] = useState(false);
 
   const submit = async () => {
     setError("");
@@ -362,7 +389,8 @@ export default function Register() {
           width: "100%",
           maxWidth: 380,
           opacity: 0,
-          animation: "fadeSlideIn 0.5s cubic-bezier(0.16,1,0.3,1) 0.05s forwards",
+          animation:
+            "fadeSlideIn 0.5s cubic-bezier(0.16,1,0.3,1) 0.05s forwards",
         }}
       >
         {/* Logo */}
@@ -385,7 +413,8 @@ export default function Register() {
             border: `1px solid ${notion.border}`,
             borderRadius: 8,
             padding: "32px 32px 28px",
-            boxShadow: "0 1px 2px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.04)",
+            boxShadow:
+              "0 1px 2px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.04)",
             animation: shake ? "shake 0.45s ease" : undefined,
           }}
         >
@@ -408,7 +437,14 @@ export default function Register() {
             >
               Create your account
             </h1>
-            <p style={{ margin: 0, fontSize: 13.5, color: notion.textMuted, lineHeight: 1.5 }}>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 13.5,
+                color: notion.textMuted,
+                lineHeight: 1.5,
+              }}
+            >
               Start managing projects in minutes.
             </p>
           </div>
@@ -459,7 +495,14 @@ export default function Register() {
               }}
             >
               <span style={{ fontSize: 14, marginTop: 1 }}>⚠️</span>
-              <p style={{ margin: 0, fontSize: 13, color: "#c0392b", lineHeight: 1.5 }}>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 13,
+                  color: "#c0392b",
+                  lineHeight: 1.5,
+                }}
+              >
                 {error}
               </p>
             </div>
@@ -493,10 +536,14 @@ export default function Register() {
                 transition: "background 150ms ease, transform 100ms ease",
                 letterSpacing: ".1px",
               }}
-              hoverStyle={busy ? {} : {
-                background: "#000",
-                transform: "translateY(-1px)",
-              }}
+              hoverStyle={
+                busy
+                  ? {}
+                  : {
+                      background: "#000",
+                      transform: "translateY(-1px)",
+                    }
+              }
             >
               {busy && <Spinner />}
               {busy ? "Creating account…" : "Create account"}

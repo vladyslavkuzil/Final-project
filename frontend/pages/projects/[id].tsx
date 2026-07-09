@@ -576,9 +576,11 @@ export default function ProjectDashboard() {
     .filter(isImageFile)
     .map((f) => f.id)
     .join(",");
+
   useEffect(() => {
     if (!project) return;
     const present = new Set(project.files.filter(isImageFile).map((f) => f.id));
+    // eslint-disable-next-line
     setThumbs((t) => {
       const stale = Object.keys(t).filter((id) => !present.has(id));
       if (!stale.length) return t;
@@ -618,6 +620,7 @@ export default function ProjectDashboard() {
 
   useEffect(() => {
     if (id && project) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFilesLoading(true);
       loadProjectDocuments(id)
         .then((members) => setLiveMembers(members))
@@ -638,11 +641,11 @@ export default function ProjectDashboard() {
     if (tab === "members" && id) {
       fetchMembers(id);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, id]);
 
   // Close the mobile "more" menu whenever the tab changes.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMoreMenuOpen(false);
   }, [tab]);
 
@@ -902,12 +905,20 @@ export default function ProjectDashboard() {
             </div>
 
             {isAdmin ? (
-              <button type="button" className="danger-btn" onClick={onDeleteProject}>
+              <button
+                type="button"
+                className="danger-btn"
+                onClick={onDeleteProject}
+              >
                 <span style={{ fontSize: 13 }}>🗑</span>
                 Delete project
               </button>
             ) : (
-              <button type="button" className="danger-btn" onClick={onLeaveProject}>
+              <button
+                type="button"
+                className="danger-btn"
+                onClick={onLeaveProject}
+              >
                 <span style={{ fontSize: 13 }}>⏻</span>
                 Leave project
               </button>
