@@ -122,20 +122,46 @@ resource "aws_security_group" "rds" {
   tags = { Name = "${var.project_name}-rds-sg" }
 }
 
+# ─── SECURITY GROUP: LAMBDA (SIZE CALCULATOR) ──────────────────────────────
+# Allows the size calculator Lambda outbound access (to S3 and Redis)
+
+resource "aws_security_group" "lambda" {
+  name        = "${var.project_name}-lambda-sg"
+  description = "Security group for Lambda functions in VPC"
+  vpc_id      = module.vpc.vpc_id
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = { Name = "${var.project_name}-lambda-sg" }
+}
+
 # ─── SECURITY GROUP: REDIS ───────────────────────────────────────────────────
-# Only accepts Redis traffic from ECS — nothing else can reach the cache
+# Accepts Redis traffic from ECS and the size calculator Lambda
 
 resource "aws_security_group" "redis" {
   name        = "${var.project_name}-redis-sg"
-  description = "Allow Redis inbound only from ECS"
+  description = "Allow Redis inbound from ECS and Lambda"
   vpc_id      = module.vpc.vpc_id
 
   ingress {
-    description     = "Redis from ECS only"
+    description     = "Redis from ECS"
     from_port       = 6379
     to_port         = 6379
     protocol        = "tcp"
     security_groups = [aws_security_group.ecs.id]
+  }
+
+  ingress {
+    description     = "Redis from Lambda"
+    from_port       = 6379
+    to_port         = 6379
+    protocol        = "tcp"
+    security_groups = [aws_security_group.lambda.id]
   }
 
   egress {
@@ -305,7 +331,7 @@ resource "aws_s3_bucket_notification" "documents" {
 
   lambda_function {
     lambda_function_arn = aws_lambda_function.dispatcher.arn
-    events              = ["s3:ObjectCreated:*"]
+    events              = ["s3:ObjectCreated:*", "s3:ObjectRemoved:*"]
     filter_prefix       = "original/"
   }
 
@@ -414,6 +440,11 @@ resource "aws_iam_role_policy_attachment" "size_calculator_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+resource "aws_iam_role_policy_attachment" "size_calculator_vpc" {
+  role       = aws_iam_role.size_calculator_lambda.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+
 resource "aws_iam_role_policy" "size_calculator_s3" {
   name = "${var.project_name}-size-calculator-s3"
   role = aws_iam_role.size_calculator_lambda.id
@@ -448,9 +479,17 @@ resource "aws_lambda_function" "size_calculator" {
   filename         = data.archive_file.size_calculator_zip.output_path
   source_code_hash = data.archive_file.size_calculator_zip.output_base64sha256
 
+  # Attach Lambda to VPC so it can reach ElastiCache Redis
+  vpc_config {
+    subnet_ids         = module.vpc.private_subnet_ids
+    security_group_ids = [aws_security_group.lambda.id]
+  }
+
   environment {
     variables = {
       MAX_PROJECT_SIZE_MB = "100"
+      REDIS_HOST          = module.redis.redis_endpoint
+      REDIS_PORT          = tostring(module.redis.redis_port)
     }
   }
 }
